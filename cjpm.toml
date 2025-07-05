@@ -1,0 +1,17 @@
+[dependencies]
+  sonyflake = { git = "https://github.com/ystyle/cj-sonyflake", branch = "master"}
+
+[package]
+  cjc-version = "0.58.3"
+  compile-option = ""
+  description = "nothing here"
+  link-option = ""
+  name = "mcp"
+  output-type = "static"
+  override-compile-option = ""
+  src-dir = ""
+  target-dir = ""
+  version = "1.0.0"
+
+[package.package-configuration."mcp.examples"]
+output-type = "executable"

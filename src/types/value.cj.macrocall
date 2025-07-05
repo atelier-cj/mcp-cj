@@ -1,0 +1,225 @@
+package mcp.types
+
+import encoding.json.stream.*
+import std.collection.HashMap
+import std.deriving.*
+import std.io.ByteBuffer
+
+/* ===== Emitted by MacroCall @Derive in value.cj:8:1 ===== */
+/* 8.1 */public enum Value <: JsonDeserializable < Value > & JsonSerializable {
+/* 8.2 */    Null |
+/* 8.3 */    Boolean(Bool) |
+/* 8.4 */    Number(Float64) |
+/* 8.5 */    String(String) |
+/* 8.6 */    Array(Array < Value >) |
+/* 8.7 */    Map(HashMap < String, Value >)
+/* 8.8 */    
+/* 8.9 */    public static func from < T >(val: T): Value where T <: JsonDeserializable < T > & JsonSerializable {
+/* 8.10 */        match(val) {
+/* 8.11 */            case v: UInt8 => Value.Number(Float64(v))
+/* 8.12 */            case v: UInt16 => Value.Number(Float64(v))
+/* 8.13 */            case v: UInt32 => Value.Number(Float64(v))
+/* 8.14 */            case v: UInt64 => Value.Number(Float64(v))
+/* 8.15 */            case v: Int8 => Value.Number(Float64(v))
+/* 8.16 */            case v: Int16 => Value.Number(Float64(v))
+/* 8.17 */            case v: Int32 => Value.Number(Float64(v))
+/* 8.18 */            case v: Int64 => Value.Number(Float64(v))
+/* 8.19 */            case v: Float16 => Value.Number(Float64(v))
+/* 8.20 */            case v: Float32 => Value.Number(Float64(v))
+/* 8.21 */            case v: Float64 => Value.Number(v)
+/* 8.22 */            case v: Bool => Value.Boolean(v)
+/* 8.23 */            case v: String => Value.String(v)
+/* 8.24 */            case v: Collection < T > =>
+/* 8.25 */            var arr = Array < Value >(v.size, repeat: Value.Null)
+/* 8.26 */            var i = 0
+/* 8.27 */            for(vv in v) {
+/* 8.28 */                arr[i] = Value.from(vv)
+/* 8.29 */                i ++
+/* 8.30 */            }
+/* 8.31 */            Value.Array(arr)
+/* 8.32 */            case v: HashMap < String, T > =>
+/* 8.33 */            var m = HashMap < String, Value >(v.size)
+/* 8.34 */            for((k, vv) in v) {
+/* 8.35 */                m[k] = Value.from(vv)
+/* 8.36 */            }
+/* 8.37 */            Value.Map(m)
+/* 8.38 */            case _ =>
+/* 8.39 */            let buf = ByteBuffer()
+/* 8.40 */            let w = JsonWriter(buf)
+/* 8.41 */            val.toJson(w)
+/* 8.42 */            let r = JsonReader(buf)
+/* 8.43 */            Value.fromJson(r)
+/* 8.44 */        }
+/* 8.45 */    }
+/* 8.46 */    
+/* 8.47 */    public func to < T >(): T where T <: JsonDeserializable < T > & JsonSerializable {
+/* 8.48 */        let buf = ByteBuffer()
+/* 8.49 */        let w = JsonWriter(buf)
+/* 8.50 */        this.toJson(w)
+/* 8.51 */        let r = JsonReader(buf)
+/* 8.52 */        T.fromJson(r)
+/* 8.53 */    }
+/* 8.54 */    
+/* 8.55 */    public func toJson(w: JsonWriter): Unit {
+/* 8.56 */        match(this) {
+/* 8.57 */            case Value.Null => w.writeNullValue()
+/* 8.58 */            case Value.Boolean(v) => v.toJson(w)
+/* 8.59 */            case Value.Number(v) => v.toJson(w)
+/* 8.60 */            case Value.String(v) => v.toJson(w)
+/* 8.61 */            case Value.Array(v) => v.toJson(w)
+/* 8.62 */            case Value.Map(v) => v.toJson(w)
+/* 8.63 */        }
+/* 8.64 */    }
+/* 8.65 */    
+/* 8.66 */    public static func fromJson(r: JsonReader): Value {
+/* 8.67 */        while(let Some(v) <- r.peek()) {
+/* 8.68 */            match(v) {
+/* 8.69 */                case JsonNull =>
+/* 8.70 */                r.skip()
+/* 8.71 */                return Value.Null
+/* 8.72 */                case JsonBool =>
+/* 8.73 */                let b = r.readValue < Bool >()
+/* 8.74 */                return Boolean(b)
+/* 8.75 */                case JsonNumber =>
+/* 8.76 */                let f = r.readValue < Float64 >()
+/* 8.77 */                return Value.Number(f)
+/* 8.78 */                case BeginArray =>
+/* 8.79 */                let arr = r.readValue < Array < Value >>()
+/* 8.80 */                return Value.Array(arr)
+/* 8.81 */                case JsonString =>
+/* 8.82 */                let str = r.readValue < String >()
+/* 8.83 */                return Value.String(str)
+/* 8.84 */                case BeginObject =>
+/* 8.85 */                let m = r.readValue < HashMap < String, Value >>()
+/* 8.86 */                return Value.Map(m)
+/* 8.87 */                case _ => throw Exception()
+/* 8.88 */            }
+/* 8.89 */        }
+/* 8.90 */        return Value.Null
+/* 8.91 */    }
+/* 8.92 */}
+/* 8.93 */extend Value <: ToString {
+/* 8.94 */    public func toString(): String {
+/* 8.95 */        let sb = StringBuilder()
+/* 8.96 */        sb.append("Value")
+/* 8.97 */        match(this) {
+/* 8.98 */            case Null => sb.append(".Null")
+/* 8.99 */            ()
+/* 8.100 */            case Boolean(field0) => sb.append(".Boolean")
+/* 8.101 */            sb.append("(")
+/* 8.102 */            sb.append(field0.toString())
+/* 8.103 */            sb.append(")")
+/* 8.104 */            case Number(fl0) => sb.append(".Number")
+/* 8.105 */            sb.append("(")
+/* 8.106 */            sb.append(fl0.toString())
+/* 8.107 */            sb.append(")")
+/* 8.108 */            case String(str0) => sb.append(".String")
+/* 8.109 */            sb.append("(")
+/* 8.110 */            sb.append(str0.toString())
+/* 8.111 */            sb.append(")")
+/* 8.112 */            case Array(field0) => sb.append(".Array")
+/* 8.113 */            sb.append("(")
+/* 8.114 */            sb.append(field0.toString())
+/* 8.115 */            sb.append(")")
+/* 8.116 */            case Map(field0) => sb.append(".Map")
+/* 8.117 */            sb.append("(")
+/* 8.118 */            sb.append(field0.toString())
+/* 8.119 */            sb.append(")")
+/* 8.120 */        }
+/* 8.121 */        return sb.toString()
+/* 8.122 */    }
+/* 8.123 */}
+/* 8.124 */extend Value {
+/* 8.125 */    private func derivingChecks_(): Unit {
+/* 8.126 */        func check_Boolean_0 < T_Boolean_0 >(_: Bool): ToString where T_Boolean_0 <: ToString {
+/* 8.127 */            throw Exception()
+/* 8.128 */        }
+/* 8.129 */        let _ = check_Boolean_0 < Bool >
+/* 8.130 */        func check_Number_1 < T_Number_1 >(_: Float64): ToString where T_Number_1 <: ToString {
+/* 8.131 */            throw Exception()
+/* 8.132 */        }
+/* 8.133 */        let _ = check_Number_1 < Float64 >
+/* 8.134 */        func check_String_2 < T_String_2 >(_: String): ToString where T_String_2 <: ToString {
+/* 8.135 */            throw Exception()
+/* 8.136 */        }
+/* 8.137 */        let _ = check_String_2 < String >
+/* 8.138 */        func check_Array_3 < T_Array_3 >(_: Array < Value >): ToString where T_Array_3 <: ToString {
+/* 8.139 */            throw Exception()
+/* 8.140 */        }
+/* 8.141 */        let _ = check_Array_3 < Array < Value >>
+/* 8.142 */        func check_Map_4 < T_Map_4 >(_: HashMap < String, Value >): ToString where T_Map_4 <: ToString {
+/* 8.143 */            throw Exception()
+/* 8.144 */        }
+/* 8.145 */        let _ = check_Map_4 < HashMap < String, Value >>
+/* 8.146 */        derivingChecks2_()
+/* 8.147 */    }
+/* 8.148 */    private func derivingChecks2_(): Unit {
+/* 8.149 */        derivingChecks_()
+/* 8.150 */    }
+/* 8.151 */}
+/* 8.152 */
+/* ===== End of the Emit ===== */
+
+
+/* ===== Emitted by MacroCall @Derive in value.cj:103:1 ===== */
+/* 103.1 */public enum RequestId <: JsonDeserializable < RequestId > & JsonSerializable {
+/* 103.2 */    String(String) | Int(Int64)
+/* 103.3 */    
+/* 103.4 */    public func toJson(w: JsonWriter): Unit {
+/* 103.5 */        match(this) {
+/* 103.6 */            case RequestId.String(v) => v.toJson(w)
+/* 103.7 */            case RequestId.Int(v) => v.toJson(w)
+/* 103.8 */        }
+/* 103.9 */        return
+/* 103.10 */    }
+/* 103.11 */    
+/* 103.12 */    public static func fromJson(r: JsonReader): RequestId {
+/* 103.13 */        while(let Some(v) <- r.peek()) {
+/* 103.14 */            match(v) {
+/* 103.15 */                case JsonString =>
+/* 103.16 */                let str = r.readValue < String >()
+/* 103.17 */                return RequestId.String(str)
+/* 103.18 */                case JsonNumber =>
+/* 103.19 */                let f = r.readValue < Float64 >()
+/* 103.20 */                return RequestId.Int(Int64(f))
+/* 103.21 */                case _ =>()
+/* 103.22 */            }
+/* 103.23 */        }
+/* 103.24 */        return RequestId.Int(0)
+/* 103.25 */    }
+/* 103.26 */}
+/* 103.27 */extend RequestId <: ToString {
+/* 103.28 */    public func toString(): String {
+/* 103.29 */        let sb = StringBuilder()
+/* 103.30 */        sb.append("RequestId")
+/* 103.31 */        match(this) {
+/* 103.32 */            case String(str0) => sb.append(".String")
+/* 103.33 */            sb.append("(")
+/* 103.34 */            sb.append(str0.toString())
+/* 103.35 */            sb.append(")")
+/* 103.36 */            case Int(i0) => sb.append(".Int")
+/* 103.37 */            sb.append("(")
+/* 103.38 */            sb.append(i0.toString())
+/* 103.39 */            sb.append(")")
+/* 103.40 */        }
+/* 103.41 */        return sb.toString()
+/* 103.42 */    }
+/* 103.43 */}
+/* 103.44 */extend RequestId {
+/* 103.45 */    private func derivingChecks_(): Unit {
+/* 103.46 */        func check_String_0 < T_String_0 >(_: String): ToString where T_String_0 <: ToString {
+/* 103.47 */            throw Exception()
+/* 103.48 */        }
+/* 103.49 */        let _ = check_String_0 < String >
+/* 103.50 */        func check_Int_1 < T_Int_1 >(_: Int64): ToString where T_Int_1 <: ToString {
+/* 103.51 */            throw Exception()
+/* 103.52 */        }
+/* 103.53 */        let _ = check_Int_1 < Int64 >
+/* 103.54 */        derivingChecks2_()
+/* 103.55 */    }
+/* 103.56 */    private func derivingChecks2_(): Unit {
+/* 103.57 */        derivingChecks_()
+/* 103.58 */    }
+/* 103.59 */}
+/* 103.60 */
+/* ===== End of the Emit ===== */
