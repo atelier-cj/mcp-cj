@@ -4,7 +4,12 @@ import std.collection.{HashMap, ArrayList}
 import encoding.json.stream.*
 import mcp.types.*
 import mcp.types.Error as McpError
+import mcp.utils.JsonParserUtil
 import std.sync.{ReentrantReadWriteMutex, AtomicBool}
+import log.{Logger, LogLevel}
+import logger.{TextLogger}
+import std.fs.{File, OpenMode}
+import std.io.ByteBuffer
 
 public type ServerOption = (McpServer) -> Unit
 
@@ -55,44 +60,78 @@ public class McpServer {
     var currentClient: ?NotificationContext = None
     var mu = ReentrantReadWriteMutex()
     let initialized = AtomicBool(false)
+    let errlogger: Logger
     public init(name: String, version: String, opts: Array<ServerOption>) {
         this.name = name
         this.version = version
+        let jl = TextLogger(File("mcp.log", OpenMode.Append))
+        jl.level = LogLevel.ALL
+        this.errlogger = jl
         for (opt in opts) {
             opt(this)
         }
     }
-    public func handleMessage(rawmsg: JsonReader): JsonRpcMessage {
-        var basemsgopt: ?BaseMessage = None
-        try {
-            basemsgopt = BaseMessage.fromJson(rawmsg)
-        } catch (e: Exception) {
+    public func handleMessage(jsonBytes: Array<UInt8>): JsonRpcMessage {
+        let basemsgopt: ?BaseMessage = JsonParserUtil.parseFromBytes<BaseMessage>(jsonBytes)
+        if (let None <- basemsgopt) {
+            this.errlogger.error("Failed to parse base message")
             return createErrorResponse(RequestId.Int(0), PARSE_ERROR, "Failed to parse message")
         }
+        
         let basemsg = basemsgopt.getOrThrow()
+        this.errlogger.error("parse base message:basemsg method: ${basemsg.method}")
+    
         if (basemsg.jsonrpc != "2.0") {
             return createErrorResponse(basemsg.id, INVALID_REQUEST, "Invalid JSON-RPC version")
         }
+        
         if (let None <- basemsg.id) {
-            this.handleNotification(basemsg.method, rawmsg)
+            this.handleNotification(basemsg.method, jsonBytes)
             return NoOpMessage()
         }
+        
         match (basemsg.method) {
             case "initialize" => 
-                let request = InitializeRequest.fromJson(rawmsg)
-                return  this.handleInitialize(basemsg.id.getOrThrow(), request)
+                this.errlogger.info("into initialize 1")
+                let requestopt: ?InitializeRequest = JsonParserUtil.parseFromBytes<InitializeRequest>(jsonBytes)
+                if (let Some(request) <- requestopt) {
+                    this.errlogger.info("into initialize 2, ${request.method}")
+                    return this.handleInitialize(basemsg.id.getOrThrow(), request)
+                } else {
+                    return createErrorResponse(basemsg.id, PARSE_ERROR, "Failed to parse initialize request")
+                }
             case "ping" => 
-                let request = PingRequest.fromJson(rawmsg)
-                return this.handlePing(basemsg.id.getOrThrow(), request)
+                let requestopt: ?PingRequest = JsonParserUtil.parseFromBytes<PingRequest>(jsonBytes)
+                if (let Some(request) <- requestopt) {
+                    return this.handlePing(basemsg.id.getOrThrow(), request)
+                } else {
+                    return createErrorResponse(basemsg.id, PARSE_ERROR, "Failed to parse ping request")
+                }
             case "tools/list" => 
                 if (this.capabilities.tools.isNone()) {
                     return createErrorResponse(basemsg.id, METHOD_NOT_FOUND, "Tools not supported")
                 }
-                let request = ListToolsRequest.fromJson(rawmsg)
-                return this.handleListListTools(basemsg.id.getOrThrow(), request)
+                let requestopt: ?ListToolsRequest = JsonParserUtil.parseFromBytes<ListToolsRequest>(jsonBytes)
+                if (let Some(request) <- requestopt) {
+                    let resp = this.handleListListTools(basemsg.id.getOrThrow(), request)
+                    return JsonRpcResponse(basemsg.id ?? RequestId.Int(0), resp)
+                } else {
+                    return createErrorResponse(basemsg.id, PARSE_ERROR, "Failed to parse list tools request")
+                }
             case "tools/call" => 
-                let request = PingRequest.fromJson(rawmsg)
-                return this.handlePing(basemsg.id.getOrThrow(), request)
+                this.errlogger.info("tools/call")
+                let requestopt: ?CallToolRequest = JsonParserUtil.parseFromBytes<CallToolRequest>(jsonBytes)
+                if (let Some(request) <- requestopt) {
+                    if (this.capabilities.tools.isNone()) {
+                        return createErrorResponse(basemsg.id, METHOD_NOT_FOUND, "Tools not supported")
+                    }
+                    this.errlogger.info("before/call: ${request.method}, ${request.params.name}")
+                    let result = this.handleCallTool(basemsg.id.getOrThrow(), request)
+                    this.errlogger.info("after/call")
+                    return JsonRpcResponse(basemsg.id ?? RequestId.Int(0), result)
+                } else {
+                    return createErrorResponse(basemsg.id, PARSE_ERROR, "Failed to parse call tool request")
+                }
             case _ => createErrorResponse(basemsg.id, METHOD_NOT_FOUND, "Method ${basemsg.method} not found")
         }
         return NoOpMessage()
@@ -118,29 +157,40 @@ public class McpServer {
             this.sendNotificationToClient(ToolListChangedNotification())
         }
     }
-    func handleNotification(method:String, rawmsg: JsonReader):Unit {
+    func handleNotification(method:String, jsonBytes: Array<UInt8>):Unit {
         var handler :?NotificationHandlerFunc = None
         synchronized(this.mu.readMutex) {
             if (this.notificationHandlers.contains(method)) {
                 handler = this.notificationHandlers[method]
             }
         }
-        handler?(method, rawmsg)
+        
+        if (let Some(h) <- handler) {
+            let buf = ByteBuffer(jsonBytes)
+            let reader = JsonReader(buf)
+            h(method, reader)
+        }
     }
     func handleInitialize(id:RequestId, request:InitializeRequest):JsonRpcMessage {
         let capabilities = ServerCapabilities()
         if (let Some(v) <-  this.capabilities.resources) {
-            capabilities.resources = v
+            capabilities.resources = ResourceCapabilities(v.subscribe, v.listChanged)
+        } else {
+            capabilities.resources = ResourceCapabilities(false, false)
         }
         if (let Some(v) <-  this.capabilities.prompts) {
-            capabilities.prompts = v
+            capabilities.prompts = PromptCapabilities(v.listChanged)
+        }else {
+            capabilities.prompts = PromptCapabilities(false)
         }
         if (let Some(v) <-  this.capabilities.tools) {
-            capabilities.tools = v
+            capabilities.tools = ToolsCapabilities(v.listChanged)
+        } else {
+            capabilities.tools = ToolsCapabilities(false)
         }
-        if (this.capabilities.logging) {
-            capabilities.logging = true
-        }
+        // if (this.capabilities.logging) {
+        //     capabilities.logging = true
+        // }
 
         let result = InitializeResult()
         result.serverInfo = Implementation(this.name, this.version)
@@ -152,7 +202,7 @@ public class McpServer {
     func handlePing(id:RequestId, request:PingRequest):JsonRpcMessage {
         return JsonRpcResponse(id, EmptyResult())
     }
-    func handleListListTools(id:RequestId, request:ListToolsRequest):JsonRpcMessage {
+    func handleListListTools(id:RequestId, request:ListToolsRequest):Result {
         let result = ListToolsResult()
         var tools = ArrayList<Tool>()
         for ((_, tool) in this.tools) {
@@ -165,6 +215,18 @@ public class McpServer {
             }
         }
         return result
+    }
+    func handleCallTool(id:RequestId, request:CallToolRequest):Result {
+        this.errlogger.info("Call tool: " + request.params.name)
+        if (let Some(v) <- this.tools.get(request.params.name)) {
+            this.errlogger.info("Calling tool: " + request.params.name)
+           return v.handler(request)
+        }
+        this.errlogger.info("not Call tool: " + request.params.name)
+        for ((name, tool) in this.tools) {
+            this.errlogger.info("has tool: " + name)
+        }
+        return EmptyResult()
     }
 }
 

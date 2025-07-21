@@ -9,6 +9,8 @@ public class Tool <: JsonDeserializable<Tool> & JsonSerializable {
     public var inputSchema = ToolInputSchema()
     public init() {}
     public init(name:String, description:String){
+        this.name = name
+        this.description = description
         this.inputSchema = ToolInputSchema("object", HashMap<String, Value>(), [])
     }
 
@@ -33,9 +35,9 @@ public class Tool <: JsonDeserializable<Tool> & JsonSerializable {
 }
 
 public class ToolInputSchema <: JsonDeserializable<ToolInputSchema> & JsonSerializable {
-    var typ: String = ""
-    var properties = HashMap<String, Value>()
-    var required = ArrayList<String>()
+    public var typ: String = ""
+    public var properties = HashMap<String, Value>()
+    public var required = ArrayList<String>()
     public init() {}
     public init(typ:String, properties: HashMap<String, Value>, required:Array<String> ) {
         this.typ = typ
@@ -47,10 +49,10 @@ public class ToolInputSchema <: JsonDeserializable<ToolInputSchema> & JsonSerial
         if (required) {
             this.required.add(name)
         }
-        let field = HashMap<String, String>()
-        field.add("type", typ)
-        field.add("description", description)
-        this.properties.add(name, Value.from(field))
+        let field = HashMap<String, Value>()
+        field.add("type", Value.String(typ))
+        field.add("description", Value.String(description))
+        this.properties.add(name, Value.Map(field))
     }
 
     public func toJson(w: JsonWriter): Unit {
@@ -73,7 +75,7 @@ public class ToolInputSchema <: JsonDeserializable<ToolInputSchema> & JsonSerial
     }
 }
 
-public class CallToolResult <: JsonDeserializable<CallToolResult> & JsonSerializable {
+public class CallToolResult <: Result {
     public var method: String = ""
     public var content: Array<Value> = []
     public var isError = false
@@ -114,7 +116,7 @@ public class CallToolRequest <: JsonDeserializable<CallToolRequest> & JsonSerial
     }
 
     public static func fromJson(r: JsonReader): CallToolRequest {
-        let res = CallToolRequest("", ToolRequestParams())
+        let res = CallToolRequest("111", ToolRequestParams())
         fromJsonObject(
             r,
             ("method", {=> res.method = r.readValue<String>()}),
@@ -146,7 +148,7 @@ public class ToolRequestParams <: JsonDeserializable<ToolRequestParams> & JsonSe
     }
 }
 
-public class ListToolsRequest <: JsonRpcMessage {
+public class ListToolsRequest <: JsonRpcMessage & JsonDeserializable<ListToolsRequest> {
     public var method:String = "tools/list"
     public var params:?PaginatedRequest = None
     public func toJson(w: JsonWriter): Unit {
@@ -218,13 +220,15 @@ public class PaginatedResult <: JsonDeserializable<PaginatedResult> & JsonSerial
     }
 }
 
-public class ListToolsResult <: JsonRpcMessage {
+public class ListToolsResult <: Result {
     public var tools = ArrayList<Tool>()
     public var nextCursor :?Cursor = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("tools").writeValue(this.tools)
-        w.writeName("nextCursor").writeValue(this.nextCursor)
+        if (this.nextCursor.isSome()) {
+            w.writeName("nextCursor").writeValue(this.nextCursor)
+        }
         w.endObject()
     }
 

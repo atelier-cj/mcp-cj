@@ -27,6 +27,7 @@ public class JsonRpcResponse <: JsonRpcMessage {
         w.startObject()
         w.writeName("id").writeValue(this.id)
         w.writeName("result").writeValue(this.result)
+        w.writeName("jsonrpc").writeValue(this.jsonrpc)
         w.endObject()
     }
 
@@ -66,7 +67,7 @@ public class EmptyParams <: Params {
     }
 }
 
-protected class BaseMessage {
+protected class BaseMessage <: JsonDeserializable<BaseMessage> & JsonSerializable {
     public var jsonrpc: String = ""
     public var method: String = ""
     public var id: ?RequestId = None

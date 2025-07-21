@@ -15,41 +15,11 @@ public enum Value <: JsonDeserializable<Value> & JsonSerializable {
     Map(HashMap<String, Value>)
 
     public static func from<T>(val:T):Value where T <: JsonDeserializable<T> & JsonSerializable  {
-        match (val) {
-            case v:UInt8 => Value.Number(Float64(v))
-            case v:UInt16 => Value.Number(Float64(v))
-            case v:UInt32 => Value.Number(Float64(v))
-            case v:UInt64 => Value.Number(Float64(v))
-            case v:Int8 => Value.Number(Float64(v))
-            case v:Int16 => Value.Number(Float64(v))
-            case v:Int32 => Value.Number(Float64(v))
-            case v:Int64 => Value.Number(Float64(v))
-            case v:Float16 => Value.Number(Float64(v))
-            case v:Float32 => Value.Number(Float64(v))
-            case v:Float64 => Value.Number(v)
-            case v:Bool => Value.Boolean(v)
-            case v:String => Value.String(v)
-            case v:Collection<T> => 
-                var arr = Array<Value>(v.size, repeat: Value.Null)
-                var i = 0
-                for (vv in v) {
-                    arr[i] =Value.from(vv)
-                    i++
-                }
-                Value.Array(arr)
-            case v:HashMap<String, T> => 
-                var m = HashMap<String, Value>(v.size)
-                for ((k, vv) in v) {
-                    m[k] = Value.from(vv)
-                }
-                Value.Map(m)
-            case _ => 
-                let buf = ByteBuffer()
-                let w = JsonWriter(buf)
-                val.toJson(w)
-                let r = JsonReader(buf)
-                Value.fromJson(r)
-        }
+        let buf = ByteBuffer()
+        let w = JsonWriter(buf)
+        val.toJson(w)
+        let r = JsonReader(buf)
+        Value.fromJson(r)
     }
 
     public func to<T>():T where T <: JsonDeserializable<T> & JsonSerializable {

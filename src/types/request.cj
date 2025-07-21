@@ -5,7 +5,7 @@ import encoding.json.stream.*
 
 public interface ClientRequest {}
 
-public class InitializeRequest <: ClientRequest & JsonRpcRequest {
+public class InitializeRequest <: ClientRequest & JsonRpcRequest & JsonDeserializable<InitializeRequest> {
     var params = InitializeRequestParams()
     public prop method: String {
         get() {
@@ -90,7 +90,7 @@ public class ClientCapabilityRoot <: JsonDeserializable<ClientCapabilityRoot> & 
     }
 }
 
-public class PingRequest <: JsonRpcRequest{
+public class PingRequest <: JsonRpcRequest & JsonDeserializable<PingRequest>{
     public prop method:String {
         get() {
             "ping"

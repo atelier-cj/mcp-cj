@@ -1,18 +1,19 @@
 package mcp.types
 
+import std.collection.HashMap
 import encoding.json.stream.*
 
 public class ServerCapabilities <: JsonDeserializable<ServerCapabilities> & JsonSerializable {
     public var resources: Option<ResourceCapabilities> = None
     public var prompts: Option<PromptCapabilities> = None
     public var tools: Option<ToolsCapabilities> = None
-    public var logging = false
+    public var logging:?Bool = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
-        w.writeName("resources").writeValue(this.resources)
+        // w.writeName("resources").writeValue(this.resources)
         w.writeName("prompts").writeValue(this.prompts)
         w.writeName("tools").writeValue(this.tools)
-        w.writeName("logging").writeValue(this.logging)
+        w.writeName("logging").writeValue(HashMap<String,String>())
         w.endObject()
     }
 
@@ -22,7 +23,7 @@ public class ServerCapabilities <: JsonDeserializable<ServerCapabilities> & Json
             ("resources", {=> res.resources = r.readValue<Option<ResourceCapabilities>>()}),
             ("prompts", {=> res.prompts = r.readValue<Option<PromptCapabilities>>()}),
             ("tools", {=> res.tools = r.readValue<Option<ToolsCapabilities>>()}),
-            ("logging", {=> res.logging = r.readValue<Bool>()})
+            ("logging", {=> res.logging = r.readValue<Option<Bool>>()})
         )
         return res
     }
