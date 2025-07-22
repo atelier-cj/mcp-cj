@@ -1,14 +1,28 @@
 package mcp.types
 
-import std.collection.{HashMap, ArrayList}
+import std.collection.{HashMap, ArrayList, map, collectArrayList}
 import encoding.json.stream.*
+
+public type ToolOption = (Tool) -> Unit
+
+public type PropertyOption = (HashMap<String, Value>) -> Unit
 
 public class Tool <: JsonDeserializable<Tool> & JsonSerializable {
     public var name: String = ""
     public var description: String = ""
     public var inputSchema = ToolInputSchema()
     public init() {}
-    public init(name:String, description:String){
+
+    public init(name: String, opts: Array<ToolOption>) {
+        this.name = name
+        this.description = description
+        this.inputSchema = ToolInputSchema("object", HashMap<String, Value>(), [])
+        for (opt in opts) {
+            opt(this)
+        }
+    }
+
+    public init(name: String, description: String, fields: Array<(String, String, String)>) {
         this.name = name
         this.description = description
         this.inputSchema = ToolInputSchema("object", HashMap<String, Value>(), [])
@@ -39,13 +53,13 @@ public class ToolInputSchema <: JsonDeserializable<ToolInputSchema> & JsonSerial
     public var properties = HashMap<String, Value>()
     public var required = ArrayList<String>()
     public init() {}
-    public init(typ:String, properties: HashMap<String, Value>, required:Array<String> ) {
+    public init(typ: String, properties: HashMap<String, Value>, required: Array<String>) {
         this.typ = typ
         this.properties = properties
         this.required = ArrayList<String>(required)
     }
 
-    public func addField(name:String, typ:String, description:String, required!:Bool=false) {
+    public func addField(name: String, typ: String, description: String, required!: Bool = false) {
         if (required) {
             this.required.add(name)
         }
@@ -75,14 +89,206 @@ public class ToolInputSchema <: JsonDeserializable<ToolInputSchema> & JsonSerial
     }
 }
 
+public func descriptionProperty(description: String): PropertyOption {
+    return {
+        schema => schema["description"] = Value.String(description)
+    }
+}
+
+public func requiredProperty(): PropertyOption {
+    return {
+        schema => schema["required"] = Value.Boolean(true)
+    }
+}
+
+public func titleProperty(title:String): PropertyOption {
+    return {
+        schema => schema["title"] = Value.String(title)
+    }
+}
+
+public func defaultStringProperty(value:String): PropertyOption {
+    return {
+        schema => schema["default"] = Value.String(value)
+    }
+}
+
+public func defaultNumberProperty(value:Float64): PropertyOption {
+    return {
+        schema => schema["default"] = Value.Number(value)
+    }
+}
+
+public func defaultBooleanProperty(value:Bool): PropertyOption {
+    return {
+        schema => schema["default"] = Value.Boolean(value)
+    }
+}
+
+public func defaultArrayProperty(value:ArrayList<JsonValue>): PropertyOption {
+    return {
+        schema => schema["default"] = Value.Array(value)
+    }
+}
+
+public func enumProperty(values:Array<String>): PropertyOption {
+    return {
+        schema => 
+        schema["enum"] = Value.Array(values |> map({item => Value.String(item)}) |> collectArrayList)
+    }
+}
+
+public func minLengthProperty(value:Int64): PropertyOption {
+    return {
+        schema => schema["minLength"] = Value.Number(Float64(value))
+    }
+}
+
+public func maxLengthProperty(value:Int64): PropertyOption {
+    return {
+        schema => schema["maxLength"] = Value.Number(Float64(value))
+    }
+}
+
+public func patternProperty(value:String): PropertyOption {
+    return {
+        schema => schema["pattern"] = Value.String(value)
+    }
+}
+
+public func defaultNumerProperty(value:String): PropertyOption {
+    return {
+        schema => schema["pattern"] = Value.String(value)
+    }
+}
+
+public func minProperty(value:Float64): PropertyOption {
+    return {
+        schema => schema["minLength"] = Value.Number(value)
+    }
+}
+
+public func maxProperty(value:Float64): PropertyOption {
+    return {
+        schema => schema["maxLength"] = Value.Number(value)
+    }
+}
+
+public func multipleOf(value:Float64): PropertyOption {
+    return {
+        schema => schema["multipleOf"] = Value.Number(value)
+    }
+}
+
+public func withDescription(description: String): ToolOption {
+    return {
+        tool => tool.description = description
+    }
+}
+
+public func withBoolean(name: String, opts: Array<PropertyOption>): ToolOption {
+    return {
+        tool =>
+        let schema = HashMap<String, Value>()
+        schema.add("type", Value.String("boolean"))
+        for (opt in opts) {
+            opt(schema)
+        }
+
+        match (schema.get("required")) {
+            case Some(Boolean(required)) =>
+                if (required) {
+                    tool.inputSchema.required.add(name)
+                }
+            case _ => ()
+        }
+        tool.inputSchema.properties.add(name, Value.Map(schema))
+    }
+}
+
+public func withNumber(name: String, opts: Array<PropertyOption>): ToolOption {
+    return {
+        tool =>
+        let schema = HashMap<String, Value>()
+        schema.add("type", Value.String("number"))
+        for (opt in opts) {
+            opt(schema)
+        }
+        match (schema.get("required")) {
+            case Some(Boolean(required)) =>
+                if (required) {
+                    tool.inputSchema.required.add(name)
+                }
+            case _ => ()
+        }
+        tool.inputSchema.properties.add(name, Value.Map(schema))
+    }
+}
+
+public func withString(name: String, opts: Array<PropertyOption>): ToolOption {
+    return {
+        tool =>
+        let schema = HashMap<String, Value>()
+        schema.add("type", Value.String("string"))
+        for (opt in opts) {
+            opt(schema)
+        }
+        match (schema.get("required")) {
+            case Some(Boolean(required)) =>
+                if (required) {
+                    tool.inputSchema.required.add(name)
+                }
+            case _ => ()
+        }
+        tool.inputSchema.properties.add(name, Value.Map(schema))
+    }
+}
+
+public func withObject(name: String, opts: Array<PropertyOption>): ToolOption {
+    return {
+        tool =>
+        let schema = HashMap<String, Value>()
+        schema.add("type", Value.String("object"))
+        schema.add("properties", Value.Map(HashMap<String, Value>()))
+        for (opt in opts) {
+            opt(schema)
+        }
+        match (schema.get("required")) {
+            case Some(Boolean(required)) =>
+                if (required) {
+                    tool.inputSchema.required.add(name)
+                }
+            case _ => ()
+        }
+        tool.inputSchema.properties.add(name, Value.Map(schema))
+    }
+}
+
+public func withArray(name: String, opts: Array<PropertyOption>): ToolOption {
+    return {
+        tool =>
+        let schema = HashMap<String, Value>()
+        schema.add("type", Value.String("array"))
+        for (opt in opts) {
+            opt(schema)
+        }
+        match (schema.get("required")) {
+            case Some(Boolean(required)) =>
+                if (required) {
+                    tool.inputSchema.required.add(name)
+                }
+            case _ => ()
+        }
+        tool.inputSchema.properties.add(name, Value.Map(schema))
+    }
+}
+
 public class CallToolResult <: Result {
-    public var method: String = ""
     public var content: Array<Value> = []
     public var isError = false
 
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
-        w.writeName("method").writeValue(this.method)
         w.writeName("content").writeValue(this.content)
         w.writeName("isError").writeValue(this.isError)
         w.endObject()
@@ -92,11 +298,41 @@ public class CallToolResult <: Result {
         let res = CallToolResult()
         fromJsonObject(
             r,
-            ("method", {=> res.method = r.readValue<String>()}),
             ("content", {=> res.content = r.readValue<Array<Value>>()}),
             ("isError", {=> res.isError = r.readValue<Bool>()}),
         )
         return res
+    }
+    public static func text(text: String): CallToolResult {
+        let result = CallToolResult()
+        result.content = [
+            Value.Map(
+                HashMap<String, Value>(
+                    ("type", Value.String("text")),
+                    ("text", Value.String(text)),
+                )
+            )
+        ]
+        return result
+    }
+    public static func image(text: String, imageData: String, mimeType: String): CallToolResult {
+        let result = CallToolResult()
+        result.content = [
+            Value.Map(
+                HashMap<String, Value>(
+                    ("type", Value.String("text")),
+                    ("text", Value.String(text)),
+                )
+            ),
+            Value.Map(
+                HashMap<String, Value>(
+                    ("type", Value.String("image")),
+                    ("data", Value.String(imageData)),
+                    ("mimeType", Value.String(mimeType)),
+                )
+            )
+        ]
+        return result
     }
 }
 
@@ -149,8 +385,8 @@ public class ToolRequestParams <: JsonDeserializable<ToolRequestParams> & JsonSe
 }
 
 public class ListToolsRequest <: JsonRpcMessage & JsonDeserializable<ListToolsRequest> {
-    public var method:String = "tools/list"
-    public var params:?PaginatedRequest = None
+    public var method: String = "tools/list"
+    public var params: ?PaginatedRequest = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("jsonrpc").writeValue(this.jsonrpc)
@@ -171,7 +407,7 @@ public class ListToolsRequest <: JsonRpcMessage & JsonDeserializable<ListToolsRe
 }
 
 public struct Cursor <: ToString & JsonDeserializable<Cursor> & JsonSerializable {
-    public Cursor(let value:String){}
+    public Cursor(let value: String) {}
     public func toJson(w: JsonWriter): Unit {
         this.value.toJson(w)
     }
@@ -179,13 +415,13 @@ public struct Cursor <: ToString & JsonDeserializable<Cursor> & JsonSerializable
     public static func fromJson(r: JsonReader): Cursor {
         return Cursor(String.fromJson(r))
     }
-    public func toString():String {
+    public func toString(): String {
         return this.value
     }
 }
 
 public class PaginatedRequest <: JsonDeserializable<PaginatedRequest> & JsonSerializable {
-    public var cursor:?Cursor = None
+    public var cursor: ?Cursor = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("cursor").writeValue(this.cursor)
@@ -196,14 +432,14 @@ public class PaginatedRequest <: JsonDeserializable<PaginatedRequest> & JsonSeri
         let res = PaginatedRequest()
         fromJsonObject(
             r,
-            ("cursor", {=> res.cursor = r.readValue<Option<Cursor>>() }),
+            ("cursor", {=> res.cursor = r.readValue<Option<Cursor>>()}),
         )
         return res
     }
 }
 
 public class PaginatedResult <: JsonDeserializable<PaginatedResult> & JsonSerializable {
-    var nextCursor:?Cursor = None
+    var nextCursor: ?Cursor = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("nextCursor").writeValue(this.nextCursor)
@@ -214,7 +450,7 @@ public class PaginatedResult <: JsonDeserializable<PaginatedResult> & JsonSerial
         let res = PaginatedResult()
         fromJsonObject(
             r,
-            ("nextCursor", {=> res.nextCursor = r.readValue<Option<Cursor>>() }),
+            ("nextCursor", {=> res.nextCursor = r.readValue<Option<Cursor>>()}),
         )
         return res
     }
@@ -222,7 +458,7 @@ public class PaginatedResult <: JsonDeserializable<PaginatedResult> & JsonSerial
 
 public class ListToolsResult <: Result {
     public var tools = ArrayList<Tool>()
-    public var nextCursor :?Cursor = None
+    public var nextCursor: ?Cursor = None
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("tools").writeValue(this.tools)
@@ -236,8 +472,8 @@ public class ListToolsResult <: Result {
         let res = ListToolsResult()
         fromJsonObject(
             r,
-            ("tools", {=> res.tools = r.readValue<ArrayList<Tool>>() }),
-            ("nextCursor", {=> res.nextCursor = r.readValue<Option<Cursor>>() }),
+            ("tools", {=> res.tools = r.readValue<ArrayList<Tool>>()}),
+            ("nextCursor", {=> res.nextCursor = r.readValue<Option<Cursor>>()}),
         )
         return res
     }

@@ -1,3 +1,8 @@
 .cache
 .vscode
 target
+cangjie_docs
+.claude
+CLAUDE.md
+*.log
+task.md

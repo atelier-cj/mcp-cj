@@ -2,8 +2,8 @@
   sonyflake = { git = "https://github.com/ystyle/cj-sonyflake", branch = "master"}
 
 [package]
-  cjc-version = "0.58.3"
-  compile-option = ""
+  cjc-version = "0.59.6"
+  compile-option = "-Woff unused"
   description = "nothing here"
   link-option = ""
   name = "mcp"
@@ -15,3 +15,4 @@
 
 [package.package-configuration."mcp.examples"]
 output-type = "executable"
+compile-option = "--static"

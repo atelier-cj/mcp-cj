@@ -126,9 +126,14 @@ public class McpServer {
                         return createErrorResponse(basemsg.id, METHOD_NOT_FOUND, "Tools not supported")
                     }
                     this.errlogger.info("before/call: ${request.method}, ${request.params.name}")
-                    let result = this.handleCallTool(basemsg.id.getOrThrow(), request)
-                    this.errlogger.info("after/call")
-                    return JsonRpcResponse(basemsg.id ?? RequestId.Int(0), result)
+                    try {
+                        let result = this.handleCallTool(basemsg.id.getOrThrow(), request)
+                        this.errlogger.info("after/call")
+                        return JsonRpcResponse(basemsg.id ?? RequestId.Int(0), result)
+                    } catch (e: Exception) {
+                        this.errlogger.error("Error handling call tool: ${e.message}")
+                        return createErrorResponse(basemsg.id, INTERNAL_ERROR, "Error handling call tool: ${e.message}")
+                    }
                 } else {
                     return createErrorResponse(basemsg.id, PARSE_ERROR, "Failed to parse call tool request")
                 }
@@ -220,7 +225,7 @@ public class McpServer {
         this.errlogger.info("Call tool: " + request.params.name)
         if (let Some(v) <- this.tools.get(request.params.name)) {
             this.errlogger.info("Calling tool: " + request.params.name)
-           return v.handler(request)
+            return v.handler(request)
         }
         this.errlogger.info("not Call tool: " + request.params.name)
         for ((name, tool) in this.tools) {
