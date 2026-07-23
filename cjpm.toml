@@ -1,7 +1,7 @@
 [dependencies]
-  sonyflake = { git = "https://github.com/ystyle/cj-sonyflake", branch = "master"}
-  jsonvalue = { path = "../jsonvalue" }
-  "ystyle::jsonrpc" = { path = "../json-rpc/jsonrpc" }
+  "sonyflake" = "1.0.9"
+  "jsonvalue" = "1.0.1"
+  "ystyle::jsonrpc" = "0.2.0"
 
 [package]
   cjc-version = "1.1.0"

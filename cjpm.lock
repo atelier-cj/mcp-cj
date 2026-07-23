@@ -1,4 +1,6 @@
 version = 0
 
 [requires]
-  sonyflake = {git = "https://github.com/ystyle/cj-sonyflake", commitId = "411c36f15f48a77ec78c789c0cedee2c19f5c5f2", branch = "master"}
+  "ystyle::jsonrpc" = {version = "0.2.0"}
+  jsonvalue = {version = "1.0.1"}
+  sonyflake = {version = "1.0.9"}
