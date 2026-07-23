@@ -68,6 +68,32 @@ public class ServerCapabilities <: JsonSerializable & JsonDeserializable<ServerC
     }
 }
 
+public class ClientCapabilities <: JsonSerializable & JsonDeserializable<ClientCapabilities> {
+    public var experimental: ?JsonValue = None
+    public var roots: ?JsonValue = None
+    public var sampling: ?JsonValue = None
+    public var tasks: ?JsonValue = None
+    public init() {}
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        if (let Some(v) <- this.experimental) { w.writeName("experimental"); v.toJson(w) }
+        if (let Some(v) <- this.roots) { w.writeName("roots"); v.toJson(w) }
+        if (let Some(v) <- this.sampling) { w.writeName("sampling"); v.toJson(w) }
+        if (let Some(v) <- this.tasks) { w.writeName("tasks"); v.toJson(w) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): ClientCapabilities {
+        let res = ClientCapabilities()
+        fromJsonObject(r,
+            ("experimental", {=> res.experimental = r.readValue<Option<JsonValue>>()}),
+            ("roots", {=> res.roots = r.readValue<Option<JsonValue>>()}),
+            ("sampling", {=> res.sampling = r.readValue<Option<JsonValue>>()}),
+            ("tasks", {=> res.tasks = r.readValue<Option<JsonValue>>()})
+        )
+        res
+    }
+}
+
 public class ResourceCapabilities <: JsonSerializable & JsonDeserializable<ResourceCapabilities> {
     public var subscribe: Bool = false
     public var listChanged: Bool = false

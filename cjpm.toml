@@ -19,6 +19,10 @@
 output-type = "executable"
 compile-option = "--static"
 
+[package.package-configuration."mcp.examples.cli"]
+output-type = "executable"
+compile-option = "--static"
+
 [target.x86_64-unknown-linux-gnu.bin-dependencies]
 path-option = [ "${CANGJIE_STDX_PATH}" ]
 
