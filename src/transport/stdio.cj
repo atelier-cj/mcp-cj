@@ -3,51 +3,51 @@ package mcp.transport
 import ystyle::jsonrpc.*
 import std.env.{getStdIn, getStdOut}
 import std.sync.AtomicBool
-import std.io.ByteBuffer
 import std.convert.*
-import std.unicode.*
 
 public class StdioServerTransport <: Transport {
     private var running = AtomicBool(true)
     private let stdin = getStdIn()
-    private let buf = ByteBuffer()
 
     public func send(data: Array<Byte>): Unit {
+        let headerEnd = this.findHeaderEnd(data)
+        if (headerEnd >= 0) {
+            let headerStr = String.fromUtf8(data[0..headerEnd])
+            let length = this.parseLen(headerStr)
+            if (length >= 0) {
+                let bodyStart = headerEnd + 4
+                if (data.size >= bodyStart + length) {
+                    let body = data[bodyStart..(bodyStart + length)]
+                    getStdOut().write(body)
+                    getStdOut().write([10])
+                    getStdOut().flush()
+                    return
+                }
+            }
+        }
         getStdOut().write(data)
+        getStdOut().write([10])
         getStdOut().flush()
     }
 
     public func receive(): ?Array<Byte> {
-        while (!this.isClosed()) {
-            let data = this.buf.bytes()
-            let headerEnd = this.findHeaderEnd(data)
-            if (headerEnd >= 0) {
-                let headerStr = String.fromUtf8(data[0..headerEnd])
-                let length = this.parseLen(headerStr)
-                if (length >= 0) {
-                    let bodyStart = headerEnd + 4
-                    if (data.size >= bodyStart + length) {
-                        let msgLen = bodyStart + length
-                        let msg = Array<Byte>(msgLen, repeat: 0)
-                        for (i in 0..msgLen) { msg[i] = data[i] }
-                        this.buf.clear()
-                        if (data.size > msgLen) {
-                            this.buf.write(data[msgLen..data.size])
-                        }
-                        return Some(msg)
-                    }
-                }
-            }
-            let chunk = Array<Byte>(4096, repeat: 0)
-            try {
-                let n = this.stdin.read(chunk)
-                if (n <= 0) { return None }
-                this.buf.write(chunk[0..n])
-            } catch (e: Exception) {
-                return None
-            }
+        if (let Some(line) <- this.stdin.readln()) {
+            let bytes = line.toArray()
+            let lineSize = bytes.size
+            let headerStr = "Content-Length: ${lineSize}"
+            let headerBytes = headerStr.toArray()
+            let framedLen = headerBytes.size + 4 + lineSize
+            let framed = Array<Byte>(framedLen, repeat: 0)
+            for (i in 0..headerBytes.size) { framed[i] = headerBytes[i] }
+            framed[headerBytes.size] = 13
+            framed[headerBytes.size + 1] = 10
+            framed[headerBytes.size + 2] = 13
+            framed[headerBytes.size + 3] = 10
+            for (i in 0..lineSize) { framed[headerBytes.size + 4 + i] = bytes[i] }
+            Some(framed)
+        } else {
+            None
         }
-        None
     }
 
     private func findHeaderEnd(data: Array<Byte>): Int64 {
@@ -66,7 +66,7 @@ public class StdioServerTransport <: Transport {
     private func parseLen(header: String): Int64 {
         let lines = header.split('\n')
         for (line in lines) {
-            let t = line.trim()
+            let t = line.trimAscii()
             if (t.startsWith("Content-Length:")) {
                 let parts = t.split(":")
                 if (parts.size >= 2) {
