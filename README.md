@@ -1,229 +1,121 @@
-<!-- omit in toc -->
-<div align="center">
+# mcp-cj
 
-# 🎯 MCP-CangJie
+仓颉语言实现的 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 服务端框架。
 
-[![CangJie](https://img.shields.io/badge/CangJie-0.59.6-blue)](https://cangjie-lang.cn)
-[![License](https://img.shields.io/badge/license-MulanPSL2-green)](LICENSE)
+基于 [`jsonvalue`](https://github.com/ystyle/jsonvalue) + [`json-rpc`](https://github.com/ystyle/cj-json-rpc) 分层架构，支持协议版本 **2025-11-25**。
 
-<strong>仓颉语言实现的Model Context Protocol (MCP)服务器，为AI应用提供安全连接本地数据源和工具的能力</strong>
+## 架构
 
-<br>
-
-**[快速开始](#快速开始) | [示例](examples/)**
-
-<br>
-
-</div>
-
-```cangjie
-package mcp.examples
-
-import mcp.{server.*, types.*}
-
-main() {
-    let s = McpServer("演示服务器 🚀", "1.0.0", WithLogging())
-    let tool = Tool(
-        "hello_world",
-        withDescription("向某人问好"),
-        withString("name", descriptionProperty("要问候的人名")),
-    )
-    s.addTool(
-        tool,
-        {
-            req =>
-            var name = (req.params.arguments.get("name")?.asString()).flatten() ?? "世界"
-            return CallToolResult.text("你好，${name}！")
-        }
-    )
-    ServeStdio(s)
-}
+```
+mcp ──> ystyle::jsonrpc ──> jsonvalue ──> stdx.encoding.json.stream
 ```
 
-就这么简单！
-
-MCP-CangJie处理了所有复杂的协议细节和服务器管理，让您专注于构建出色的工具。它提供高级接口，易于使用。
-
-### 核心特性：
-* **🚀 高性能**：基于仓颉原生实现，性能卓越
-* **🎯 简洁**：最少的样板代码构建MCP服务器
-* **📋 完整**：全面实现MCP核心规范
-* **🔧 类型安全**：仓颉强类型系统，编译时检查
-
-## 📦 安装
-
-确保已安装仓颉编译器（版本=0.59.6）：
+## 安装
 
 ```toml
 [dependencies]
-  mcp = { git = "https://gitcode.com/ystyle/mcp-cj", branch = "master"}
+  mcp = { git = "https://github.com/ystyle/mcp-cj", branch = "master"}
 ```
 
-## ⚡ 快速开始
+```bash
+export CANGJIE_STDX_PATH=/path/to/stdx
+cjpm build
+```
 
-让我们创建一个简单的计算器服务器：
+## 快速开始
 
 ```cangjie
-package mcp.examples
+package mcp.examples.basic
 
-import mcp.{server.*, types.*}
+import jsonvalue.*
+import mcp.*
+import mcp.transport.*
+import std.collection.HashMap
 
 main() {
-    let s = McpServer("计算器演示", "1.0.0", WithLogging())
-    let calculator = Tool(
-        "calculate",
-        withDescription("执行基本算术运算"),
-        withString("operation", 
-            descriptionProperty("要执行的操作(add, subtract, multiply, divide)"), 
-            enumProperty(["add", "subtract", "multiply", "divide"])
-        ),
-        withNumber("x", descriptionProperty("第一个数字")),
-        withNumber("y", descriptionProperty("第二个数字"))
-    )
-    s.addTool(
-        calculator,
-        {
-            req =>
-            let operation = (req.params.arguments.get("operation")?.asString()).flatten() ?? "add"
-            let x = (req.params.arguments.get("x")?.asNumber()).flatten() ?? 0.0
-            let y = (req.params.arguments.get("y")?.asNumber()).flatten() ?? 0.0
-            
-            let result = match (operation) {
-                case "add" => x + y
-                case "subtract" => x - y
-                case "multiply" => x * y
-                case "divide" => y != 0.0 ? x / y : throw Exception("除零错误")
-                case _ => throw Exception("未知操作")
-            }
-            
-            return CallToolResult.text("结果: ${result}")
+    let transport = StdioServerTransport()
+    let server = McpServer("my-server", "1.0.0", transport)
+
+    let schema = ToolInputSchema("object", HashMap<String, JsonValue>(), [])
+    schema.addField("name", "string", "Name to greet", required: true)
+
+    let tool = Tool("hello", "Say hello", schema)
+    server.addTool(tool, { params =>
+        let name = match (params.arguments.get("name")) {
+            case Some(JsonValue.String(n)) => n
+            case _ => "World"
         }
-    )
-    ServeStdio(s)
+        CallToolResult.text("Hello, ${name}!")
+    })
+
+    server.serve()
 }
 ```
 
-## 📚 什么是MCP？
+用 [MCP Inspector](https://github.com/modelcontextprotocol/inspector) 测试：
 
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io) 让您能够以安全、标准化的方式为LLM应用构建暴露数据和功能的服务器。可以将其视为专为LLM交互设计的web API。
-
-MCP服务器可以：
-- 通过**资源**暴露数据（类似于GET端点，用于将信息加载到LLM上下文中）
-- 通过**工具**提供功能（类似于POST端点，用于执行代码或产生副作用）
-- 通过**提示**定义交互模式（LLM交互的可重用模板）
-
-## 🔧 核心概念
-
-### 服务器
-服务器是MCP协议的核心接口，处理连接管理、协议合规性和消息路由：
-
-```cangjie
-// 创建基本服务器
-let server = McpServer(
-    "我的服务器",  // 服务器名称
-    "1.0.0",     // 版本
-    WithLogging()  // 启用日志
-)
-
-// 使用stdio启动服务器
-ServeStdio(server)
+```bash
+npx @modelcontextprotocol/inspector --cli ./target/release/bin/mcp.examples.basic --method tools/list
+npx @modelcontextprotocol/inspector --cli ./target/release/bin/mcp.examples.basic --method tools/call --tool-name hello --tool-arg name=World
 ```
 
-### 工具（完全实现）
-工具让LLM通过您的服务器执行操作：
+## API
 
-```cangjie
-let tool = Tool("calculate", withDescription("执行计算"))
-    .withNumber("x", descriptionProperty("第一个数字"))
-    .withNumber("y", descriptionProperty("第二个数字"))
+### McpServer
 
-server.addTool(tool, { req =
-    let x = (req.params.arguments.get("x")?.asNumber()).flatten() ?? 0.0
-    let y = (req.params.arguments.get("y")?.asNumber()).flatten() ?? 0.0
-    return CallToolResult.text("结果: ${x + y}")
-})
-```
+| 方法 | 说明 |
+|------|------|
+| `init(name, version, transport)` | 创建服务器 |
+| `addTool(tool, handler)` | 注册工具 |
+| `addMcpResource(resource, handler)` | 注册资源 |
+| `addPrompt(prompt, handler)` | 注册提示模板 |
+| `start()` | 非阻塞启动 |
+| `serve()` | 阻塞启动（推荐） |
+| `close()` | 关闭服务器 |
 
-### 资源（框架已定义，功能待实现）
-资源系统已定义Capabilities框架，实际功能将在后续版本实现。
+### Transport
 
-### 提示（框架已定义，功能待实现）
-提示系统已定义Capabilities框架，实际功能将在后续版本实现。
+| 实现 | 说明 |
+|------|------|
+| `StdioServerTransport` | 标准输入输出传输 |
+| `Transport` 接口 | 自定义传输实现 |
 
-## 📊 项目进度
+### 协议支持
 
-### ✅ 已完成（基于server.cj实现）
-- [x] **核心MCP服务器** - 完整的McpServer实现，支持初始化、ping、工具列表、工具调用
-- [x] **JSON-RPC 2.0协议** - 完整的消息处理、错误处理、响应格式
-- [x] **工具系统** - 完整的工具注册、调用、错误处理、动态通知
-- [x] **类型安全** - 仓颉强类型系统，完整的Request/Response类型定义
-- [x] **配置选项** - WithResourceCapabilities、WithPromptCapabilities、WithLogging等
-- [x] **错误处理** - 完整的错误码、异常处理、日志记录
-- [x] **线程安全** - 使用ReentrantReadWriteMutex保证并发安全
-- [x] **工具动态通知** - 工具变更时的自动通知机制
+| 方法 | 状态 |
+|------|------|
+| `initialize` / `ping` | ✅ |
+| `tools/list` / `tools/call` | ✅ |
+| `resources/list` / `resources/read` | ✅ |
+| `resources/templates/list` | ✅ |
+| `prompts/list` / `prompts/get` | ✅ |
+| `notifications/*` | 部分支持 |
+| `logging/setLevel` | 待实现 |
+| `completions/complete` | 待实现 |
 
-### ⚠️ 部分实现
-- [ ] **资源系统** - 在ServerCapabilities中定义但未实现具体功能
-- [ ] **提示系统** - 在ServerCapabilities中定义但未实现具体功能
-- [ ] **日志系统** - 基础日志框架，但资源/提示日志功能待完善
+### 类型
 
-### 🚧 进行中
-- [ ] **SSE传输层** - Server-Sent Events传输（sse.cj中部分实现，handleSSE/handleMessage未完成）
-- [ ] **HTTP传输层** - 基于HTTP的传输支持
-- [ ] **资源系统** - 资源列表、读取、通知功能
-- [ ] **提示系统** - 提示列表、获取、参数处理功能
+工具相关：`Tool`, `ToolInputSchema`, `CallToolResult`, `ToolAnnotations`, `PaginatedRequest`
 
-### 📋 待实现
-- [ ] **SSE会话管理** - SSE连接的会话生命周期管理
-- [ ] **资源动态通知** - 资源变更时的自动通知
-- [ ] **提示动态通知** - 提示变更时的自动通知
-- [ ] **完整的HTTP/SSE支持** - 目前只有stdio完全可用
+资源相关：`McpResource`, `ResourceContents`, `ResourceTemplate`, `ReadResourceResult`
 
-## 🎯 当前状态总结
+提示相关：`Prompt`, `PromptArgument`, `PromptMessage`, `GetPromptResult`
 
-**已实现核心功能：**
-- ✅ MCP服务器基础架构（100%完成）
-- ✅ 工具系统（100%完成）
-- ✅ JSON-RPC 2.0协议（100%完成）
-- ✅ 错误处理和日志（100%完成）
+内容相关：`ContentBlock`, `TextContent`, `ImageContent`, `AudioContent`, `EmbeddedResource`
 
-**待完善功能：**
-- ⚠️ 资源系统（仅定义了Capabilities，无实际实现）
-- ⚠️ 提示系统（同上）
-- 🚧 SSE传输层（50%完成，缺少会话管理）
+## 依赖库
 
-**推荐当前使用：**
-- ✅ **stdio传输** - 完全可用
-- ✅ **工具功能** - 完全可用
-- ⚠️ **资源/提示功能** - 暂不推荐使用
+| 库 | 说明 |
+|------|------|
+| [jsonvalue](https://github.com/ystyle/jsonvalue) | 通用 JSON Value 类型 |
+| [json-rpc](https://github.com/ystyle/cj-json-rpc) | JSON-RPC 2.0 框架 |
 
-## 🎯 核心优势
+## 协议版本
 
-### 性能优化
-- **零拷贝序列化**：最小化内存分配
-- **类型安全**：编译时类型检查
-- **高性能JSON**：基于ArrayList的优化实现
+支持 MCP 协议版本：**2025-11-25**（Latest）
 
-### 开发体验
-- **简洁API**：直观的接口设计
-- **完整类型**：仓颉强类型支持
-- **错误处理**：完善的异常机制
+兼容版本：2025-06-18, 2025-03-26, 2024-11-05, 2024-10-07
 
-### 扩展性
-- **模块化设计**：易于扩展和定制
-- **泛型支持**：类型安全的泛型转换
-- **插件架构**：支持自定义处理器
+## License
 
-## 🚀 示例
-
-查看[`examples/`](examples/)目录获取更多示例：
-
-- [基础示例](examples/basic.cj) - 简单的"Hello World"服务器
-- [计算器](examples/calculator.cj) - 完整的计算器工具
-- [文件系统](examples/filesystem.cj) - 文件操作工具
-- [数据库](examples/database.cj) - 数据库查询工具
-
-
-## 📄 许可证
-
-木兰宽松许可证第二版（MulanPSL2）- 详见[LICENSE](LICENSE)文件。
+MIT
