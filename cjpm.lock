@@ -2,5 +2,5 @@ version = 0
 
 [requires]
   "ystyle::jsonrpc" = {version = "0.2.0"}
-  jsonvalue = {version = "1.0.1"}
   sonyflake = {version = "1.0.9"}
+  jsonvalue = {version = "1.0.1"}
