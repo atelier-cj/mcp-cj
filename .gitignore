@@ -9,3 +9,4 @@ task.mdschema-latest.json
 log.txt
 schema-*.json
 *.cj.macrocall
+*.png
