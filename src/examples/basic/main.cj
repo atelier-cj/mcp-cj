@@ -1,4 +1,4 @@
-package mcp.examples
+package mcp.examples.basic
 
 import jsonvalue.*
 import mcp.*

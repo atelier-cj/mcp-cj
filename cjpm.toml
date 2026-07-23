@@ -15,8 +15,8 @@
   target-dir = ""
   version = "2.0.0"
 
-# [package.package-configuration."mcp.examples"]
-# output-type = "executable"
+[package.package-configuration."mcp.examples.basic"]
+output-type = "executable"
 
 [target.x86_64-unknown-linux-gnu.bin-dependencies]
 path-option = [ "${CANGJIE_STDX_PATH}" ]
