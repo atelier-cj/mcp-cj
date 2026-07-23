@@ -1,6 +1,6 @@
 # mcp-cj
 
-仓颉语言实现的 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 服务端框架。
+仓颉语言实现的 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 框架，包含服务端和客户端。
 
 基于 [`jsonvalue`](https://github.com/ystyle/jsonvalue) + [`json-rpc`](https://github.com/ystyle/cj-json-rpc) 分层架构，支持协议版本 **2025-11-25**。
 
@@ -72,6 +72,44 @@ npx @modelcontextprotocol/inspector --cli ./target/release/bin/mcp.examples.basi
 | `start()` | 非阻塞启动 |
 | `serve()` | 阻塞启动（推荐） |
 | `close()` | 关闭服务器 |
+
+### McpClient
+
+| 方法 | 说明 |
+|------|------|
+| `init(transport)` | 创建客户端 |
+| `connect(clientInfo)` | 连接并完成初始化握手 |
+| `listTools()` | 列出服务端工具 |
+| `callTool(name, arguments)` | 调用工具 |
+| `listResources()` | 列出服务端资源 |
+| `readResource(uri)` | 读取资源内容 |
+| `listResourceTemplates()` | 列出资源模板 |
+| `listPrompts()` | 列出服务端提示 |
+| `getPrompt(name, arguments)` | 获取提示内容 |
+| `close()` | 关闭连接 |
+
+```cangjie
+let transport = StdioServerTransport()
+let client = McpClient(transport)
+
+let info = Implementation("my-client", "1.0.0")
+match (client.connect(info)) {
+    case Result.Ok(init) =>
+        println("Connected: ${init.serverInfo.name}")
+    case Result.Err(e) =>
+        println("Failed: ${e}")
+}
+
+// 调用工具
+let args = HashMap<String, JsonValue>()
+args.add("name", JsonValue.String("World"))
+match (client.callTool("hello", arguments: args)) {
+    case Result.Ok(r) => // handle result
+    case Result.Err(e) => println("Error: ${e}")
+}
+
+client.close()
+```
 
 ### Transport
 
