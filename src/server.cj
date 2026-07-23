@@ -43,6 +43,10 @@ public class McpServer {
         this.rpcServer.start()
     }
 
+    public func serve() {
+        this.rpcServer.serve()
+    }
+
     public func close() {
         this.rpcServer.close()
     }
