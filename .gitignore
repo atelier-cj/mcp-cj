@@ -6,3 +6,6 @@ cangjie_docs
 CLAUDE.md
 *.log
 task.mdschema-latest.json
+log.txt
+schema-*.json
+*.cj.macrocall

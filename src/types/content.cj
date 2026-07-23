@@ -1,0 +1,180 @@
+package mcp.types
+
+import jsonvalue.*
+import stdx.encoding.json.stream.*
+import std.collection.{HashMap, ArrayList}
+
+public enum ContentBlock <: JsonSerializable & JsonDeserializable<ContentBlock> {
+    | Text(TextContent)
+    | Image(ImageContent)
+    | Audio(AudioContent)
+    | Embedded(EmbeddedResource)
+    | Resource(ResourceContents)
+
+    public func toJson(w: JsonWriter): Unit {
+        match (this) {
+            case ContentBlock.Text(v) => v.toJson(w)
+            case ContentBlock.Image(v) => v.toJson(w)
+            case ContentBlock.Audio(v) => v.toJson(w)
+            case ContentBlock.Embedded(v) => v.toJson(w)
+            case ContentBlock.Resource(v) => v.toJson(w)
+        }
+    }
+    public static func fromJson(r: JsonReader): ContentBlock {
+        let start = r.tell()
+        r.startObject()
+        var typ: String = ""
+        while (r.peek() != EndObject) {
+            let n = r.readName()
+            if (n == "type") {
+                typ = r.readValue<String>()
+                break
+            }
+            r.skip()
+        }
+        while (r.peek() != EndObject) { r.skip() }
+        r.endObject()
+        r.seek(start)
+        match (typ) {
+            case "text" => ContentBlock.Text(TextContent.fromJson(r))
+            case "image" => ContentBlock.Image(ImageContent.fromJson(r))
+            case "audio" => ContentBlock.Audio(AudioContent.fromJson(r))
+            case "resource" => ContentBlock.Embedded(EmbeddedResource.fromJson(r))
+            case _ => throw Exception("Unknown content type: ${typ}")
+        }
+    }
+}
+
+public class TextContent <: JsonSerializable & JsonDeserializable<TextContent> {
+    public var type: String = "text"
+    public var text: String = ""
+    public var annotations: ?JsonValue = None
+    public init() {}
+    public init(text: String) { this.text = text }
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        w.writeName("type").writeValue(this.type)
+        w.writeName("text").writeValue(this.text)
+        if (let Some(v) <- this.annotations) { w.writeName("annotations"); v.toJson(w) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): TextContent {
+        let res = TextContent()
+        fromJsonObject(r,
+            ("type", {=> res.type = r.readValue<String>()}),
+            ("text", {=> res.text = r.readValue<String>()}),
+            ("annotations", {=> res.annotations = r.readValue<Option<JsonValue>>()})
+        )
+        res
+    }
+}
+
+public class ImageContent <: JsonSerializable & JsonDeserializable<ImageContent> {
+    public var type: String = "image"
+    public var data: String = ""
+    public var mimeType: String = ""
+    public var annotations: ?JsonValue = None
+    public init() {}
+    public init(data: String, mimeType: String) {
+        this.data = data
+        this.mimeType = mimeType
+    }
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        w.writeName("type").writeValue(this.type)
+        w.writeName("data").writeValue(this.data)
+        w.writeName("mimeType").writeValue(this.mimeType)
+        if (let Some(v) <- this.annotations) { w.writeName("annotations"); v.toJson(w) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): ImageContent {
+        let res = ImageContent()
+        fromJsonObject(r,
+            ("type", {=> res.type = r.readValue<String>()}),
+            ("data", {=> res.data = r.readValue<String>()}),
+            ("mimeType", {=> res.mimeType = r.readValue<String>()}),
+            ("annotations", {=> res.annotations = r.readValue<Option<JsonValue>>()})
+        )
+        res
+    }
+}
+
+public class AudioContent <: JsonSerializable & JsonDeserializable<AudioContent> {
+    public var type: String = "audio"
+    public var data: String = ""
+    public var mimeType: String = ""
+    public var annotations: ?JsonValue = None
+    public init() {}
+    public init(data: String, mimeType: String) {
+        this.data = data
+        this.mimeType = mimeType
+    }
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        w.writeName("type").writeValue(this.type)
+        w.writeName("data").writeValue(this.data)
+        w.writeName("mimeType").writeValue(this.mimeType)
+        if (let Some(v) <- this.annotations) { w.writeName("annotations"); v.toJson(w) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): AudioContent {
+        let res = AudioContent()
+        fromJsonObject(r,
+            ("type", {=> res.type = r.readValue<String>()}),
+            ("data", {=> res.data = r.readValue<String>()}),
+            ("mimeType", {=> res.mimeType = r.readValue<String>()}),
+            ("annotations", {=> res.annotations = r.readValue<Option<JsonValue>>()})
+        )
+        res
+    }
+}
+
+public class EmbeddedResource <: JsonSerializable & JsonDeserializable<EmbeddedResource> {
+    public var type: String = "resource"
+    public var resource = ResourceContents()
+    public var annotations: ?JsonValue = None
+    public init() {}
+    public init(resource: ResourceContents) { this.resource = resource }
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        w.writeName("type").writeValue(this.type)
+        w.writeName("resource").writeValue(this.resource)
+        if (let Some(v) <- this.annotations) { w.writeName("annotations"); v.toJson(w) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): EmbeddedResource {
+        let res = EmbeddedResource()
+        fromJsonObject(r,
+            ("type", {=> res.type = r.readValue<String>()}),
+            ("resource", {=> res.resource = r.readValue<ResourceContents>()}),
+            ("annotations", {=> res.annotations = r.readValue<Option<JsonValue>>()})
+        )
+        res
+    }
+}
+
+public class ResourceContents <: JsonSerializable & JsonDeserializable<ResourceContents> {
+    public var uri: String = ""
+    public var mimeType: ?String = None
+    public var text: ?String = None
+    public var blob: ?String = None
+    public init() {}
+    public func toJson(w: JsonWriter): Unit {
+        w.startObject()
+        w.writeName("uri").writeValue(this.uri)
+        if (let Some(v) <- this.mimeType) { w.writeName("mimeType").writeValue(v) }
+        if (let Some(v) <- this.text) { w.writeName("text").writeValue(v) }
+        if (let Some(v) <- this.blob) { w.writeName("blob").writeValue(v) }
+        w.endObject()
+    }
+    public static func fromJson(r: JsonReader): ResourceContents {
+        let res = ResourceContents()
+        fromJsonObject(r,
+            ("uri", {=> res.uri = r.readValue<String>()}),
+            ("mimeType", {=> res.mimeType = r.readValue<Option<String>>()}),
+            ("text", {=> res.text = r.readValue<Option<String>>()}),
+            ("blob", {=> res.blob = r.readValue<Option<String>>()})
+        )
+        res
+    }
+}
