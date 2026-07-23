@@ -1,18 +1,30 @@
 [dependencies]
   sonyflake = { git = "https://github.com/ystyle/cj-sonyflake", branch = "master"}
+  jsonvalue = { path = "../jsonvalue" }
+  "ystyle::jsonrpc" = { path = "../json-rpc/jsonrpc" }
 
 [package]
-  cjc-version = "0.59.6"
+  cjc-version = "1.1.0"
   compile-option = "-Woff unused"
-  description = "nothing here"
+  description = "MCP (Model Context Protocol) 服务端框架"
   link-option = ""
   name = "mcp"
   output-type = "static"
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "1.0.0"
+  version = "2.0.0"
 
-[package.package-configuration."mcp.examples"]
-output-type = "executable"
-compile-option = "--static"
+# [package.package-configuration."mcp.examples"]
+# output-type = "executable"
+
+[target.x86_64-unknown-linux-gnu.bin-dependencies]
+path-option = [ "${CANGJIE_STDX_PATH}" ]
+
+[target.x86_64-w64-mingw32.bin-dependencies]
+path-option = [ "${CANGJIE_STDX_PATH}" ]
+
+[target.aarch64-linux-ohos.bin-dependencies]
+  path-option = ["${CANGJIE_STDX_PATH}"]
+[target.x86_64-linux-ohos.bin-dependencies]
+  path-option = ["${CANGJIE_STDX_PATH}"]
