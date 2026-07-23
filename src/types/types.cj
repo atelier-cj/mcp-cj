@@ -13,8 +13,8 @@ public const INVALID_PARAMS = -32602
 public const INTERNAL_ERROR = -32603
 
 public class Implementation <: JsonSerializable & JsonDeserializable<Implementation> {
-    var name: String = ""
-    var version: String = ""
+    public var name: String = ""
+    public var version: String = ""
     public init() {}
     public init(name: String, version: String) {
         this.name = name
