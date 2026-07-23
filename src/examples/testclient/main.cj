@@ -4,37 +4,45 @@ import jsonvalue.*
 import mcp.*
 import mcp.transport.*
 import ystyle::jsonrpc.{Transport, Result}
-import std.io.ByteBuffer
+import std.sync.Mutex
 import std.collection.{HashMap, ArrayList}
 
 public class PipeTransport <: Transport {
     private var peer: ?PipeTransport = None
-    private let buf = ByteBuffer()
-    private var peerBuf: ?ByteBuffer = None
+    private var buf = Array<Byte>(0, repeat: 0)
+    private let mu = Mutex()
 
     public init() {}
 
     public func link(other: PipeTransport): Unit {
         this.peer = other
-        this.peerBuf = other.buf
         other.peer = this
-        other.peerBuf = this.buf
     }
 
     public func send(data: Array<Byte>): Unit {
-        if (let Some(buf) <- this.peerBuf) {
-            buf.write(data)
+        if (let Some(p) <- this.peer) {
+            synchronized(p.mu) {
+                let newSize = p.buf.size + data.size
+                let newBuf = Array<Byte>(newSize, repeat: 0)
+                for (i in 0..p.buf.size) { newBuf[i] = p.buf[i] }
+                for (i in 0..data.size) { newBuf[p.buf.size + i] = data[i] }
+                p.buf = newBuf
+            }
         }
     }
 
     public func receive(): ?Array<Byte> {
         var result: ?Array<Byte> = None
         while (result.isNone()) {
-            let data = this.buf.bytes()
-            if (data.size > 0) {
-                this.buf.clear()
-                result = Some(data)
-            } else {
+            synchronized(this.mu) {
+                if (this.buf.size > 0) {
+                    let msg = Array<Byte>(this.buf.size, repeat: 0)
+                    for (i in 0..this.buf.size) { msg[i] = this.buf[i] }
+                    this.buf = Array<Byte>(0, repeat: 0)
+                    result = Some(msg)
+                }
+            }
+            if (result.isNone()) {
                 sleep(Duration.millisecond * 10)
             }
         }
