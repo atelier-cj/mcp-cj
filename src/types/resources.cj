@@ -40,19 +40,25 @@ public class McpResource <: JsonSerializable & JsonDeserializable<McpResource> {
 public class ResourceContents <: JsonSerializable & JsonDeserializable<ResourceContents> {
     public var uri: String = ""
     public var mimeType: ?String = None
+    public var text: ?String = None
+    public var blob: ?String = None
     public init() {}
     public init(uri: String) { this.uri = uri }
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("uri").writeValue(this.uri)
         if (let Some(v) <- this.mimeType) { w.writeName("mimeType").writeValue(v) }
+        if (let Some(v) <- this.text) { w.writeName("text").writeValue(v) }
+        if (let Some(v) <- this.blob) { w.writeName("blob").writeValue(v) }
         w.endObject()
     }
     public static func fromJson(r: JsonReader): ResourceContents {
         let res = ResourceContents()
         fromJsonObject(r,
             ("uri", {=> res.uri = r.readValue<String>()}),
-            ("mimeType", {=> res.mimeType = r.readValue<Option<String>>()})
+            ("mimeType", {=> res.mimeType = r.readValue<Option<String>>()}),
+            ("text", {=> res.text = r.readValue<Option<String>>()}),
+            ("blob", {=> res.blob = r.readValue<Option<String>>()})
         )
         res
     }
