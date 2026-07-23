@@ -118,10 +118,10 @@ public class CallToolResult <: JsonSerializable & JsonDeserializable<CallToolRes
         res
     }
     public static func text(text: String): CallToolResult {
-        CallToolResult(
-            ArrayList<ContentBlock>([ContentBlock.Text(TextContent(text))]),
-            false
-        )
+        let r = CallToolResult()
+        r.content = ArrayList<ContentBlock>([ContentBlock.Text(TextContent(text))])
+        r.isError = false
+        r
     }
 }
 
@@ -223,8 +223,9 @@ public class PaginatedResult <: JsonSerializable & JsonDeserializable<PaginatedR
     }
 }
 
-public class ListToolsResult <: PaginatedResult {
+public class ListToolsResult <: JsonSerializable & JsonDeserializable<ListToolsResult> {
     public var tools = ArrayList<Tool>()
+    public var nextCursor: ?Cursor = None
     public init() {}
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
