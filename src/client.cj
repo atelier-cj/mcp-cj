@@ -1,7 +1,7 @@
 package mcp
 
 import jsonvalue.*
-import ystyle::jsonrpc.{JsonRpcClient, Transport, RequestId, Result}
+import ystyle::jsonrpc.{JsonRpcClient, Transport, NewlineFraming, RequestId, Result}
 import stdx.encoding.json.stream.*
 import std.collection.*
 import mcp.types.*
@@ -14,7 +14,7 @@ public class McpClient {
     private var initialized: Bool = false
 
     public init(transport: Transport) {
-        this.rpcClient = JsonRpcClient(transport)
+        this.rpcClient = JsonRpcClient(transport, framing: NewlineFraming())
     }
 
     public func connect(clientInfo: Implementation, timeout!: Duration = 30 * Duration.second): Result<InitializeResult> {

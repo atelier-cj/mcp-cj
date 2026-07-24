@@ -1,7 +1,7 @@
 package mcp
 
 import jsonvalue.*
-import ystyle::jsonrpc.*
+import ystyle::jsonrpc.{JsonRpcServer, Transport, HandlerContext, HandlerResult, NewlineFraming}
 import stdx.encoding.json.stream.*
 import std.collection.*
 import mcp.types.*
@@ -27,7 +27,7 @@ public class McpServer {
     public init(name: String, version: String, transport: Transport) {
         this.name = name
         this.version = version
-        this.rpcServer = JsonRpcServer(transport)
+        this.rpcServer = JsonRpcServer(transport, framing: NewlineFraming())
         this.registerHandlers()
     }
 
