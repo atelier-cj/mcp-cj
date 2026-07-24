@@ -14,11 +14,11 @@ mcp ──> ystyle::jsonrpc ──> jsonvalue ──> stdx.encoding.json.stream
 
 ```toml
 [dependencies]
-  mcp = { git = "https://github.com/ystyle/mcp-cj", branch = "master"}
+  mcp = "2.0.0"
 ```
 
 ```bash
-export CANGJIE_STDX_PATH=/path/to/stdx
+eval "$(cjvs stdx-env zsh)"   # 设置 stdx 环境变量
 cjpm build
 ```
 
@@ -115,8 +115,36 @@ client.close()
 
 | 实现 | 说明 |
 |------|------|
-| `StdioServerTransport` | 标准输入输出传输 |
+| `StdioServerTransport` | 标准输入输出传输（服务端） |
+| `StdioClientTransport` | 标准输入输出传输（客户端，subprocess） |
+| `StreamableHttpServerTransport` | Streamable HTTP 传输（服务端，支持 SSE + POST） |
+| `StreamableHttpClientTransport` | Streamable HTTP 传输（客户端） |
 | `Transport` 接口 | 自定义传输实现 |
+
+### 使用 Streamable HTTP Transport
+
+服务端（基于 `stdx.net.http`）：
+
+```cangjie
+import stdx.net.http.*
+
+let httpServer = ServerBuilder()
+    .addr("127.0.0.1").port(8080).build()
+
+let transport = StreamableHttpServerTransport()
+transport.registerRoutes(httpServer.distributor)
+
+let server = McpServer("my-server", "1.0.0", transport)
+// ... 注册工具、资源等 ...
+server.start()
+httpServer.serve()
+```
+
+客户端（连接上述服务端）：
+
+```cangjie
+let client = McpClient(StreamableHttpClientTransport("http://127.0.0.1:8080"))
+```
 
 ### 协议支持
 

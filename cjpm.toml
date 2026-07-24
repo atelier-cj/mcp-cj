@@ -1,7 +1,7 @@
 [dependencies]
   "sonyflake" = "1.0.9"
   "jsonvalue" = "1.0.1"
-  "ystyle::jsonrpc" = { path = "../json-rpc/jsonrpc" }
+  "ystyle::jsonrpc" = "0.3.0"
 
 [package]
   cjc-version = "1.1.0"
