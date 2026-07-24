@@ -39,6 +39,7 @@ public class StreamableHttpServerTransport <: Transport {
             .header("content-type", "text/event-stream")
             .header("cache-control", "no-cache")
             .header("connection", "keep-alive")
+            .header("transfer-encoding", "chunked")
 
         let writer = HttpResponseWriter(ctx)
         let sid = sonyflake.NextID().toString()

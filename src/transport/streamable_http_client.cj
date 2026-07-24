@@ -27,7 +27,12 @@ public class StreamableHttpClientTransport <: Transport {
         let buf = Array<Byte>(1, repeat: 0)
         let accumulated = ArrayList<Byte>()
         while (!this.closed) {
-            let n = this.sseBody.read(buf)
+            let n: Int64
+            try {
+                n = this.sseBody.read(buf)
+            } catch (_: Exception) {
+                return None
+            }
             if (n <= 0) { return None }
             accumulated.add(buf[0])
             if (accumulated.size >= 2 &&
@@ -60,9 +65,13 @@ public class StreamableHttpClientTransport <: Transport {
             .body(json)
             .post()
             .build()
-        let resp = this.client.send(req)
-        if (resp.status != 200) {
-            throw Exception("POST failed: " + resp.status.toString())
+        try {
+            let resp = this.client.send(req)
+            if (resp.status != 200) {
+                throw Exception("POST failed: " + resp.status.toString())
+            }
+        } catch (e: Exception) {
+            if (!this.closed) { throw e }
         }
     }
 
@@ -70,7 +79,12 @@ public class StreamableHttpClientTransport <: Transport {
         let buf = Array<Byte>(1, repeat: 0)
         let accumulated = ArrayList<Byte>()
         while (!this.closed) {
-            let n = this.sseBody.read(buf)
+            let n: Int64
+            try {
+                n = this.sseBody.read(buf)
+            } catch (_: Exception) {
+                return None
+            }
             if (n <= 0) { return None }
             accumulated.add(buf[0])
             let size = accumulated.size
