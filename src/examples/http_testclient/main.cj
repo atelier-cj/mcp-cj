@@ -32,7 +32,9 @@ main() {
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("http-test-server", "1.0.0", transport)
+    mcpServer.instructions = "HTTP e2e test server"
 
+    // ======== Tool ========
     let toolschema = ToolInputSchema("object", HashMap<String, JsonValue>(), [])
     toolschema.addField("name", "string", "Name to greet", required: true)
 
@@ -43,6 +45,52 @@ main() {
             case _ => "World"
         }
         CallToolResult.text("Hello, ${name}!")
+    })
+
+    // ======== Resource ========
+    let resource = McpResource("greeting://World", "Greeting Resource")
+    resource.description = "A sample static resource"
+    mcpServer.addMcpResource(resource, { params =>
+        let name = params.uri.split("://").get(1) ?? "World"
+        let result = ReadResourceResult()
+        let rc = ResourceContents(params.uri)
+        rc.mimeType = Some("text/plain")
+        rc.text = Some("Hello, ${name}! This is a resource.")
+        result.contents = ArrayList<ResourceContents>([rc])
+        result
+    })
+
+    let template = McpResourceTemplate("docs://{path}", "Documentation Resource")
+    template.description = "A template resource for documentation"
+    mcpServer.addMcpResourceTemplate(template)
+
+    // ======== Prompt ========
+    let prompt = Prompt("greet")
+    prompt.description = "Generate a personalized greeting"
+    prompt.arguments = ArrayList<PromptArgument>([
+        PromptArgument("name"),
+        PromptArgument("language"),
+    ])
+    prompt.arguments.getOrThrow()[0].description = "Name to greet"
+    prompt.arguments.getOrThrow()[1].description = "Language (zh/en)"
+    prompt.arguments.getOrThrow()[1].required = Some(false)
+
+    mcpServer.addPrompt(prompt, { params =>
+        let name = params.arguments?.get("name")
+        let lang = params.arguments?.get("language")
+        let nameStr = match (name) { case Some(Some(n)) => n case _ => "World" }
+        let langStr = match (lang) { case Some(Some(l)) => l case _ => "en" }
+        let text = if (langStr == "zh") {
+            "你好，${nameStr}！"
+        } else {
+            "Hello, ${nameStr}!"
+        }
+        let result = GetPromptResult()
+        result.description = Some("Greeting for ${nameStr}")
+        result.messages = ArrayList<PromptMessage>([
+            PromptMessage("user", ContentBlock.Text(TextContent(text)))
+        ])
+        result
     })
 
     mcpServer.start()
@@ -98,6 +146,63 @@ main() {
             }
         case Result.Err(e) =>
             println("FAIL: callTool failed: ${e}")
+    }
+
+    println("\n=== Testing listResources ===")
+    match (client.listResources()) {
+        case Result.Ok(result) =>
+            for (res in result.resources) {
+                println("  Resource: ${res.uri} - ${res.name}")
+            }
+        case Result.Err(e) =>
+            println("FAIL: listResources failed: ${e}")
+    }
+
+    println("\n=== Testing readResource ===")
+    match (client.readResource("greeting://World")) {
+        case Result.Ok(result) =>
+            for (content in result.contents) {
+                if (let Some(text) <- content.text) {
+                    println("  Content: ${text}")
+                }
+            }
+        case Result.Err(e) =>
+            println("FAIL: readResource failed: ${e}")
+    }
+
+    println("\n=== Testing listResourceTemplates ===")
+    match (client.listResourceTemplates()) {
+        case Result.Ok(result) =>
+            for (t in result.resourceTemplates) {
+                println("  Template: ${t.name} - ${t.uriTemplate}")
+            }
+        case Result.Err(e) =>
+            println("FAIL: listResourceTemplates failed: ${e}")
+    }
+
+    println("\n=== Testing listPrompts ===")
+    match (client.listPrompts()) {
+        case Result.Ok(result) =>
+            for (prompt in result.prompts) {
+                println("  Prompt: ${prompt.name} - ${prompt.description}")
+            }
+        case Result.Err(e) =>
+            println("FAIL: listPrompts failed: ${e}")
+    }
+
+    println("\n=== Testing getPrompt ===")
+    let promptArgs = HashMap<String, String>()
+    promptArgs.add("name", "Alice")
+    match (client.getPrompt("greet", arguments: promptArgs)) {
+        case Result.Ok(result) =>
+            for (msg in result.messages) {
+                match (msg.content) {
+                    case ContentBlock.Text(tc) => println("  Message: ${tc.text}")
+                    case _ => println("  Unexpected content type")
+                }
+            }
+        case Result.Err(e) =>
+            println("FAIL: getPrompt failed: ${e}")
     }
 
     client.close()
