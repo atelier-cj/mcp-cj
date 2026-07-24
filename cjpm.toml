@@ -7,7 +7,7 @@
   cjc-version = "1.1.0"
   compile-option = "-Woff unused"
   description = "MCP (Model Context Protocol) 服务端框架"
-  link-option = ""
+  link-option = "-lstdx.crypto.digest"
   name = "mcp"
   output-type = "static"
   override-compile-option = ""
