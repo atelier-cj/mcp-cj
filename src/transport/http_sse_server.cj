@@ -9,7 +9,7 @@ import sonyflake.*
 
 let sonyflake = Sonyflake(Setting(Random().nextUInt16()))
 
-public class StreamableHttpServerTransport <: Transport {
+public class HttpSseServerTransport <: Transport {
     private let messageQueue = ArrayList<Array<Byte>>()
     private let lock = Mutex()
     private let recvCond: Condition

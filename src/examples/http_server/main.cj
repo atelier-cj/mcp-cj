@@ -12,7 +12,7 @@ main() {
         .port(8080)
         .build()
 
-    let transport = StreamableHttpServerTransport()
+    let transport = SessionHttpServerTransport()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("http-hello-server", "1.0.0", transport)
@@ -33,8 +33,6 @@ main() {
     mcpServer.start()
 
     println("MCP HTTP server listening on http://127.0.0.1:8080")
-    println("SSE endpoint: http://127.0.0.1:8080/sse")
-    println("Message endpoint: http://127.0.0.1:8080/message")
 
     server.serve()
 }

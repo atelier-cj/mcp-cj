@@ -10,6 +10,12 @@ public type ToolHandlerFunc = (ToolRequestParams) -> CallToolResult
 public type ResourceHandlerFunc = (ReadResourceRequestParams) -> ReadResourceResult
 public type PromptHandlerFunc = (GetPromptRequestParams) -> GetPromptResult
 
+// Notification callback types
+public type CancelledCallback = (CancelledNotificationParams) -> Unit
+public type ProgressCallback = (ProgressNotificationParams) -> Unit
+public type RootsListChangedCallback = () -> Unit
+public type InitializedCallback = () -> Unit
+
 public class McpServer {
     private let rpcServer: JsonRpcServer
     private let tools = HashMap<String, ToolHandlerFunc>()
@@ -23,6 +29,11 @@ public class McpServer {
     public var instructions: ?String = None
     public let name: String
     public let version: String
+
+    private var cancelledCb: ?CancelledCallback = None
+    private var progressCb: ?ProgressCallback = None
+    private var rootsListChangedCb: ?RootsListChangedCallback = None
+    private var initializedCb: ?InitializedCallback = None
 
     public init(name: String, version: String, transport: Transport) {
         this.name = name
@@ -41,6 +52,10 @@ public class McpServer {
         this.rpcServer.register("resources/templates/list", { ctx => this.handleListMcpResourceTemplates(ctx) })
         this.rpcServer.register("prompts/list", { ctx => this.handleListPrompts(ctx) })
         this.rpcServer.register("prompts/get", { ctx => this.handleGetPrompt(ctx) })
+        this.rpcServer.register("notifications/initialized", { ctx => this.handleInitialized(ctx) })
+        this.rpcServer.register("notifications/cancelled", { ctx => this.handleCancelled(ctx) })
+        this.rpcServer.register("notifications/progress", { ctx => this.handleProgress(ctx) })
+        this.rpcServer.register("notifications/roots/list_changed", { ctx => this.handleRootsListChanged(ctx) })
     }
 
     public func addTool(tool: Tool, handler: ToolHandlerFunc) {
@@ -73,6 +88,11 @@ public class McpServer {
         this.promptDefs[prompt.name] = prompt
         this.prompts[prompt.name] = handler
     }
+
+    public func setOnCancelled(cb: CancelledCallback): Unit { this.cancelledCb = cb }
+    public func setOnProgress(cb: ProgressCallback): Unit { this.progressCb = cb }
+    public func setOnRootsListChanged(cb: RootsListChangedCallback): Unit { this.rootsListChangedCb = cb }
+    public func setOnInitialized(cb: InitializedCallback): Unit { this.initializedCb = cb }
 
     public func start() {
         this.rpcServer.start()
@@ -164,6 +184,66 @@ public class McpServer {
             }
         }
         HandlerResult.err(METHOD_NOT_FOUND, "Prompt not found: ${name}")
+    }
+
+    // ---- Notification Handlers (Client → Server) ----
+
+    private func handleInitialized(ctx: HandlerContext): HandlerResult {
+        if (let Some(cb) <- this.initializedCb) { cb() }
+        HandlerResult.ok(JsonValue.Null)
+    }
+
+    private func handleCancelled(ctx: HandlerContext): HandlerResult {
+        if (let Some(cb) <- this.cancelledCb) {
+            if (let Some(params) <- ctx.getParams<CancelledNotificationParams>()) {
+                cb(params)
+            }
+        }
+        HandlerResult.ok(JsonValue.Null)
+    }
+
+    private func handleProgress(ctx: HandlerContext): HandlerResult {
+        if (let Some(cb) <- this.progressCb) {
+            if (let Some(params) <- ctx.getParams<ProgressNotificationParams>()) {
+                cb(params)
+            }
+        }
+        HandlerResult.ok(JsonValue.Null)
+    }
+
+    private func handleRootsListChanged(ctx: HandlerContext): HandlerResult {
+        if (let Some(cb) <- this.rootsListChangedCb) { cb() }
+        HandlerResult.ok(JsonValue.Null)
+    }
+
+    // ---- Notification Emit (Server → Client) ----
+
+    public func notifyResourceListChanged(): Unit {
+        this.rpcServer.notify("notifications/resources/list_changed")
+    }
+
+    public func notifyResourceUpdated(uri: String): Unit {
+        this.rpcServer.notify("notifications/resources/updated", params: ResourceUpdatedNotificationParams(uri))
+    }
+
+    public func notifyPromptListChanged(): Unit {
+        this.rpcServer.notify("notifications/prompts/list_changed")
+    }
+
+    public func notifyToolListChanged(): Unit {
+        this.rpcServer.notify("notifications/tools/list_changed")
+    }
+
+    public func notifyLogMessage(level: LoggingLevel, data: JsonValue, logger!: ?String = None): Unit {
+        this.rpcServer.notify("notifications/message", params: LoggingMessageNotificationParams(level, data, logger: logger))
+    }
+
+    public func notifyCancelled(requestId: JsonValue, reason!: ?String = None): Unit {
+        this.rpcServer.notify("notifications/cancelled", params: CancelledNotificationParams(requestId, reason: reason))
+    }
+
+    public func notifyProgress(progressToken: JsonValue, progress: Float64, total!: ?Float64 = None, message!: ?String = None): Unit {
+        this.rpcServer.notify("notifications/progress", params: ProgressNotificationParams(progressToken, progress, total: total, message: message))
     }
 }
 

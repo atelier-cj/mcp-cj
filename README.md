@@ -117,11 +117,15 @@ client.close()
 |------|------|
 | `StdioServerTransport` | 标准输入输出传输（服务端） |
 | `StdioClientTransport` | 标准输入输出传输（客户端，subprocess） |
-| `StreamableHttpServerTransport` | Streamable HTTP 传输（服务端，支持 SSE + POST） |
-| `StreamableHttpClientTransport` | Streamable HTTP 传输（客户端） |
+| `HttpSseServerTransport` | HTTP+SSE 传输（服务端，2024-11-05 旧版，已废弃） |
+| `HttpSseClientTransport` | HTTP+SSE 传输（客户端） |
+| `SessionHttpServerTransport` | Streamable HTTP 传输（服务端，2025-11-25，带 session） |
+| `SessionHttpClientTransport` | Streamable HTTP 传输（客户端） |
+| `StatelessHttpServerTransport` | Streamable HTTP 传输（服务端，2026-07-28，无 session） |
+| `StatelessHttpClientTransport` | Streamable HTTP 传输（客户端） |
 | `Transport` 接口 | 自定义传输实现 |
 
-### 使用 Streamable HTTP Transport
+### 使用 Streamable HTTP Transport (2025-11-25 Session)
 
 服务端（基于 `stdx.net.http`）：
 
@@ -131,7 +135,7 @@ import stdx.net.http.*
 let httpServer = ServerBuilder()
     .addr("127.0.0.1").port(8080).build()
 
-let transport = StreamableHttpServerTransport()
+let transport = SessionHttpServerTransport()
 transport.registerRoutes(httpServer.distributor)
 
 let server = McpServer("my-server", "1.0.0", transport)
@@ -143,7 +147,7 @@ httpServer.serve()
 客户端（连接上述服务端）：
 
 ```cangjie
-let client = McpClient(StreamableHttpClientTransport("http://127.0.0.1:8080"))
+let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 ```
 
 ### 协议支持
@@ -155,9 +159,17 @@ let client = McpClient(StreamableHttpClientTransport("http://127.0.0.1:8080"))
 | `resources/list` / `resources/read` | ✅ |
 | `resources/templates/list` | ✅ |
 | `prompts/list` / `prompts/get` | ✅ |
-| `notifications/*` | 部分支持 |
+| `notifications/initialized` | ✅ |
+| `notifications/cancelled` | ✅ (双向) |
+| `notifications/progress` | ✅ (双向) |
+| `notifications/roots/list_changed` | ✅ |
+| `notifications/resources/*` | ✅ (list_changed / updated) |
+| `notifications/prompts/list_changed` | ✅ |
+| `notifications/tools/list_changed` | ✅ |
+| `notifications/message` (日志) | ✅ |
 | `logging/setLevel` | 待实现 |
-| `completions/complete` | 待实现 |
+| `completion/complete` | 待实现 |
+| `resources/subscribe` / `resources/unsubscribe` | 待实现 |
 
 ### 类型
 
@@ -178,9 +190,24 @@ let client = McpClient(StreamableHttpClientTransport("http://127.0.0.1:8080"))
 
 ## 协议版本
 
-支持 MCP 协议版本：**2025-11-25**（Latest）
+支持 MCP 协议版本：
 
-兼容版本：2025-06-18, 2025-03-26, 2024-11-05, 2024-10-07
+| 版本 | Transport | 状态 |
+|------|-----------|------|
+| **2026-07-28** | `StatelessHttpTransport` | RC，最新协议 |
+| **2025-11-25** | `SessionHttpTransport` | Latest，**推荐** |
+| 2024-11-05 | `HttpSseTransport` | 已废弃 |
+
+兼容版本：2025-06-18, 2025-03-26, 2024-10-07
+
+### Transport 选型指南
+
+| Transport | 适用场景 |
+|-----------|----------|
+| `StdioServerTransport` | 本地子进程模式，最通用 |
+| `SessionHttpServerTransport` | **推荐** Streamable HTTP (2025-11-25)，支持 opencode / Cherry Studio / Inspector |
+| `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28)，最新协议，无 session |
+| `HttpSseServerTransport` | 已废弃的 HTTP+SSE 旧协议 (2024-11-05)，仅用于兼容老客户端 |
 
 ## License
 

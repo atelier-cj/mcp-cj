@@ -1,7 +1,7 @@
 [dependencies]
   "sonyflake" = "1.0.9"
   "jsonvalue" = "1.0.1"
-  "ystyle::jsonrpc" = "0.3.0"
+  "ystyle::jsonrpc" = "0.4.1"
 
 [package]
   cjc-version = "1.1.0"
@@ -13,7 +13,7 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.0.0"
+  version = "2.1.0"
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
@@ -32,6 +32,10 @@ output-type = "executable"
 compile-option = "--static"
 
 [package.package-configuration."mcp.examples.http_testclient"]
+output-type = "executable"
+compile-option = "--static"
+
+[package.package-configuration."mcp.examples.notification_test"]
 output-type = "executable"
 compile-option = "--static"
 

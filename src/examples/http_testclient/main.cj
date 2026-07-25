@@ -28,7 +28,7 @@ main() {
         }
     })
 
-    let transport = StreamableHttpServerTransport()
+    let transport = SessionHttpServerTransport()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("http-test-server", "1.0.0", transport)
@@ -108,7 +108,7 @@ main() {
     let baseUrl = "http://127.0.0.1:${portHolder.value}"
     println("Server started at ${baseUrl}")
 
-    let client = McpClient(StreamableHttpClientTransport(baseUrl))
+    let client = McpClient(SessionHttpClientTransport(baseUrl))
     let info = Implementation("http-test-client", "1.0.0")
 
     println("=== Testing connect ===")

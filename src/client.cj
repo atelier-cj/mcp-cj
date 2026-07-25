@@ -1,7 +1,7 @@
 package mcp
 
 import jsonvalue.*
-import ystyle::jsonrpc.{JsonRpcClient, Transport, NewlineFraming, RequestId, Result}
+import ystyle::jsonrpc.{JsonRpcClient, Transport, NewlineFraming, RequestId, Result, NotificationCallback}
 import stdx.encoding.json.stream.*
 import std.collection.*
 import mcp.types.*
@@ -45,6 +45,24 @@ public class McpClient {
     public func getServerCapabilities(): ?ServerCapabilities { this.serverCapabilities }
     public func getServerInfo(): ?Implementation { this.serverInfo }
     public func getServerProtocolVersion(): String { this.serverProtocolVersion }
+
+    // ---- Notifications ----
+
+    public func setNotificationCallback(cb: NotificationCallback): Unit {
+        this.rpcClient.setNotificationCallback(cb)
+    }
+
+    public func cancelRequest(requestId: JsonValue, reason!: ?String = None): Unit {
+        this.rpcClient.notify("notifications/cancelled", params: CancelledNotificationParams(requestId, reason: reason))
+    }
+
+    public func notifyProgress(progressToken: JsonValue, progress: Float64, total!: ?Float64 = None, message!: ?String = None): Unit {
+        this.rpcClient.notify("notifications/progress", params: ProgressNotificationParams(progressToken, progress, total: total, message: message))
+    }
+
+    public func notifyRootsListChanged(): Unit {
+        this.rpcClient.notify("notifications/roots/list_changed")
+    }
 
     // ---- Tools ----
 
