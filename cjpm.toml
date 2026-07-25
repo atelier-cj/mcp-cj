@@ -13,7 +13,7 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.1.0"
+  version = "2.2.0"
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
@@ -36,6 +36,10 @@ output-type = "executable"
 compile-option = "--static"
 
 [package.package-configuration."mcp.examples.notification_test"]
+output-type = "executable"
+compile-option = "--static"
+
+[package.package-configuration."mcp.examples.stateless_test"]
 output-type = "executable"
 compile-option = "--static"
 

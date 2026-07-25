@@ -159,8 +159,9 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 | `resources/list` / `resources/read` | ✅ |
 | `resources/templates/list` | ✅ |
 | `prompts/list` / `prompts/get` | ✅ |
+| `subscriptions/listen` | ✅ (StatelessHttpTransport) |
 | `notifications/initialized` | ✅ |
-| `notifications/cancelled` | ✅ (双向) |
+| `notifications/cancelled` | ✅ (双向，Session/Stdio) |
 | `notifications/progress` | ✅ (双向) |
 | `notifications/roots/list_changed` | ✅ |
 | `notifications/resources/*` | ✅ (list_changed / updated) |
@@ -169,7 +170,8 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 | `notifications/message` (日志) | ✅ |
 | `logging/setLevel` | 待实现 |
 | `completion/complete` | 待实现 |
-| `resources/subscribe` / `resources/unsubscribe` | 待实现 |
+| Header 校验 (`MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name`) | ✅ (StatelessHttpTransport) |
+| 取消语义（关 SSE 流 = 取消） | ✅ (StatelessHttpTransport) |
 
 ### 类型
 
@@ -206,7 +208,7 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 |-----------|----------|
 | `StdioServerTransport` | 本地子进程模式，最通用 |
 | `SessionHttpServerTransport` | **推荐** Streamable HTTP (2025-11-25)，支持 opencode / Cherry Studio / Inspector |
-| `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28)，最新协议，无 session |
+| `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28)，最新协议，无 session，支持 subscriptions/listen |
 | `HttpSseServerTransport` | 已废弃的 HTTP+SSE 旧协议 (2024-11-05)，仅用于兼容老客户端 |
 
 ## License
