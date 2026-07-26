@@ -13,7 +13,7 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.2.1"
+  version = "2.3.0"
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
@@ -27,19 +27,19 @@ compile-option = "--static"
 output-type = "executable"
 compile-option = "--static"
 
-[package.package-configuration."mcp.examples.http_server"]
+[package.package-configuration."mcp.examples.v2025_11_25_streamable_server"]
 output-type = "executable"
 compile-option = "--static"
 
-[package.package-configuration."mcp.examples.http_testclient"]
+[package.package-configuration."mcp.examples.v2025_11_25_streamable_test"]
 output-type = "executable"
 compile-option = "--static"
 
-[package.package-configuration."mcp.examples.notification_test"]
+[package.package-configuration."mcp.examples.v2025_11_25_notification_test"]
 output-type = "executable"
 compile-option = "--static"
 
-[package.package-configuration."mcp.examples.stateless_test"]
+[package.package-configuration."mcp.examples.v2026_07_28_stateless_test"]
 output-type = "executable"
 compile-option = "--static"
 

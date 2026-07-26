@@ -1,4 +1,4 @@
-package mcp.examples.http_server
+package mcp.examples.v2025_11_25_streamable_server
 
 import jsonvalue.*
 import mcp.*
@@ -12,7 +12,7 @@ main() {
         .port(8080)
         .build()
 
-    let transport = SessionHttpServerTransport()
+    let transport = StreamableHttpServer_2025_11_25()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("http-hello-server", "1.0.0", transport)

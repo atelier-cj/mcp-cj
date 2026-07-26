@@ -4,13 +4,14 @@ import ystyle::jsonrpc.*
 import jsonvalue.*
 import stdx.net.http.*
 import std.collection.ArrayList
-import std.sync.{Mutex, Condition}
+import std.sync.{Mutex, Condition, AtomicInt64}
 import std.random.Random
 import sonyflake.*
 
 let sf = Sonyflake(Setting(Random().nextUInt16()))
+let nextSessionId = AtomicInt64(1)
 
-public class SessionHttpServerTransport <: Transport {
+public class StreamableHttpServer_2025_11_25 <: Transport {
     private let messageQueue = ArrayList<Array<Byte>>()
     private let lock = Mutex()
     private let recvCond: Condition
@@ -33,6 +34,8 @@ public class SessionHttpServerTransport <: Transport {
                 this.handleSSE(ctx)
             } else if (ctx.request.method == "POST") {
                 this.handlePost(ctx)
+            } else if (ctx.request.method == "DELETE") {
+                this.handleDelete(ctx)
             } else {
                 ctx.responseBuilder.status(405).header("content-type", "text/plain").body("Method not allowed")
             }
@@ -48,13 +51,10 @@ public class SessionHttpServerTransport <: Transport {
             .header("transfer-encoding", "chunked")
 
         let writer = HttpResponseWriter(ctx)
-        let sid = sf.NextID().toString()
 
         synchronized(this.lock) {
             this.sseWriter = Some(writer)
         }
-
-        writer.write(("event: session_id\ndata: " + sid + "\n\n").toArray())
 
         synchronized(this.lock) {
             while (!this.closed) {
@@ -64,6 +64,12 @@ public class SessionHttpServerTransport <: Transport {
     }
 
     private func handlePost(ctx: HttpContext): Unit {
+        // Validate MCP-Protocol-Version header
+        if (ctx.request.headers.getFirst("MCP-Protocol-Version").isNone()) {
+            ctx.responseBuilder.status(400).header("content-type", "text/plain").body("Missing MCP-Protocol-Version header")
+            return
+        }
+
         let buf = Array<Byte>(4096, repeat: 0)
         let total = ArrayList<Byte>()
         while (true) {
@@ -71,53 +77,65 @@ public class SessionHttpServerTransport <: Transport {
             if (len <= 0) { break }
             total.add(all: buf[0..len])
         }
-
         if (total.size == 0) {
             ctx.responseBuilder.status(400).header("content-type", "text/plain").body("Empty body")
             return
         }
 
         let bodyStr = String.fromUtf8(total.toArray())
-        let jv = JsonValue.parse(bodyStr)
+        let jv = try { JsonValue.parse(bodyStr) } catch (_: Exception) { JsonValue.Null }
+
+        // Determine if this is a notification (no id) or request (has id)
         let isNotification = match (jv["id"]) { case None => true case _ => false }
 
-        let useSSE = match (ctx.request.url.query) {
-            case Some(q) => q.contains("session_id")
-            case None => false
+        // Create session for initialize without MCP-Session-Id
+        let hasSessionHeader = ctx.request.headers.getFirst("MCP-Session-Id").isSome()
+        let methodName = match (jv["method"]) {
+            case Some(JsonValue.String(m)) => m
+            case _ => ""
+        }
+        let shouldCreateSession = !hasSessionHeader && methodName == "initialize"
+
+        // Notifications: accept with 202
+        if (isNotification) {
+            ctx.responseBuilder.status(202).body("")
+            return
         }
 
-        if (useSSE) {
-            synchronized(this.lock) {
-                this.messageQueue.add(total.toArray())
-                this.recvCond.notifyAll()
+        // Requests: queue and wait for response
+        synchronized(this.lock) {
+            this.messageQueue.add(total.toArray())
+            this.recvCond.notifyAll()
+        }
+
+        let respBytes = synchronized(this.lock) {
+            this.waitingForResponse = true
+            while (this.pendingResponse.isNone() && !this.closed) {
+                this.respCond.wait(timeout: 30 * Duration.second)
             }
-            ctx.responseBuilder.status(200).header("content-type", "application/json").body("{\"ok\":true}")
-        } else {
-            synchronized(this.lock) {
-                this.messageQueue.add(total.toArray())
-                this.recvCond.notifyAll()
-                if (!isNotification) {
-                    this.waitingForResponse = true
-                    while (this.pendingResponse.isNone() && !this.closed) {
-                        this.respCond.wait(timeout: 30 * Duration.second)
-                    }
-                    if (let Some(response) <- this.pendingResponse) {
-                        this.pendingResponse = None
-                        this.waitingForResponse = false
-                        let respStr = String.fromUtf8(response)
-                        ctx.responseBuilder.status(200)
-                            .header("content-type", "application/json")
-                            .body(respStr)
-                    } else {
-                        this.waitingForResponse = false
-                        ctx.responseBuilder.status(504).body("{\"error\":\"timeout\"}")
-                    }
-                }
-            }
-            if (isNotification) {
-                ctx.responseBuilder.status(202).body("")
+            if (let Some(response) <- this.pendingResponse) {
+                this.pendingResponse = None
+                this.waitingForResponse = false
+                Option<Array<Byte>>.Some(response)
+            } else {
+                this.waitingForResponse = false
+                Option<Array<Byte>>.None
             }
         }
+
+        let builder = ctx.responseBuilder.status(200).header("content-type", "application/json")
+        if (shouldCreateSession) {
+            let sid = nextSessionId.fetchAdd(1).toString()
+            builder.header("MCP-Session-Id", sid)
+        }
+        match (respBytes) {
+            case Some(b) => builder.body(String.fromUtf8(b))
+            case None => builder.body("{\"error\":\"timeout\"}")
+        }
+    }
+
+    private func handleDelete(ctx: HttpContext): Unit {
+        ctx.responseBuilder.status(405).header("content-type", "text/plain").body("Method not allowed")
     }
 
     public func send(data: Array<Byte>): Unit {

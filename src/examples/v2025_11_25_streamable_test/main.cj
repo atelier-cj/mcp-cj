@@ -1,4 +1,4 @@
-package mcp.examples.http_testclient
+package mcp.examples.v2025_11_25_streamable_test
 
 import jsonvalue.*
 import mcp.*
@@ -28,7 +28,7 @@ main() {
         }
     })
 
-    let transport = SessionHttpServerTransport()
+    let transport = StreamableHttpServer_2025_11_25()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("http-test-server", "1.0.0", transport)
@@ -108,7 +108,7 @@ main() {
     let baseUrl = "http://127.0.0.1:${portHolder.value}"
     println("Server started at ${baseUrl}")
 
-    let client = McpClient(SessionHttpClientTransport(baseUrl))
+    let client = McpClient(StreamableHttpClient_2025_11_25(baseUrl))
     let info = Implementation("http-test-client", "1.0.0")
 
     println("=== Testing connect ===")

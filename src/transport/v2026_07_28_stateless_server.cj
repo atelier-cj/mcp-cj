@@ -59,7 +59,7 @@ class RequestSseStream {
     }
 }
 
-public class StatelessHttpServerTransport <: Transport {
+public class StatelessHttpServer_2026_07_28 <: Transport {
     private let lock = Mutex()
     private let recvCond: Condition
     private let respCond: Condition

@@ -1,4 +1,4 @@
-package mcp.examples.stateless_test
+package mcp.examples.v2026_07_28_stateless_test
 
 import jsonvalue.*
 import mcp.*
@@ -28,7 +28,7 @@ main() {
         }
     })
 
-    let transport = StatelessHttpServerTransport()
+    let transport = StatelessHttpServer_2026_07_28()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("stateless-test-server", "1.0.0", transport)
@@ -49,7 +49,7 @@ main() {
     let baseUrl = "http://127.0.0.1:${portHolder.value}"
     println("Server started at ${baseUrl}")
 
-    let client = McpClient(StatelessHttpClientTransport(baseUrl))
+    let client = McpClient(StatelessHttpClient_2026_07_28(baseUrl))
     let info = Implementation("stateless-test-client", "1.0.0")
 
     println("=== Testing connect ===")

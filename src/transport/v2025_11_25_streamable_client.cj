@@ -1,35 +1,89 @@
 package mcp.transport
 
 import ystyle::jsonrpc.*
-import jsonvalue.*
 import stdx.net.http.*
-import stdx.encoding.base64.toBase64String
 import std.io.InputStream
 import std.collection.{ArrayList, HashMap}
 import std.sync.{Mutex, Condition}
 
-public class StatelessHttpClientTransport <: Transport {
+public class StreamableHttpClient_2025_11_25 <: Transport {
     private let endpointUrl: String
     private let client: Client
     private let responseQueue = ArrayList<Array<Byte>>()
     private let lock = Mutex()
     private let cond: Condition
+    private var sessionId: String = ""
     private var closed: Bool = false
-    private let toolParamHeaders = HashMap<String, HashMap<String, String>>()
     private let customHeaders = HashMap<String, String>()
+
+    public init(endpointUrl: String, headers: HashMap<String, String>) {
+        this.endpointUrl = endpointUrl.trimEnd('/')
+        this.client = ClientBuilder().build()
+        this.cond = synchronized(this.lock) { this.lock.condition() }
+        for ((k, v) in headers) { this.customHeaders.add(k, v) }
+        this.startNotifStream()
+    }
 
     public init(endpointUrl: String) {
         this.endpointUrl = endpointUrl.trimEnd('/')
         this.client = ClientBuilder().build()
         this.cond = synchronized(this.lock) { this.lock.condition() }
+        this.startNotifStream()
+    }
+
+    private func startNotifStream(): Unit {
+        try {
+            let builder = HttpRequestBuilder()
+                .url(this.endpointUrl)
+                .header("Accept", "text/event-stream")
+            for ((k, v) in this.customHeaders) { builder.header(k, v) }
+            let req = builder.get().build()
+            let resp = this.client.send(req)
+            spawn { => this.readNotifStream(resp.body) }
+        } catch (_: Exception) { }
+    }
+
+    private func readNotifStream(body: InputStream): Unit {
+        try {
+            let buf = Array<Byte>(1, repeat: 0)
+            let accumulated = ArrayList<Byte>()
+            while (!this.closed) {
+                let n: Int64
+                try {
+                    n = body.read(buf)
+                } catch (_: Exception) { break }
+                if (n <= 0) { break }
+                accumulated.add(buf[0])
+                let size = accumulated.size
+                if (size >= 2 &&
+                    accumulated[size - 2] == 10 &&
+                    accumulated[size - 1] == 10) {
+                    let raw = Array<Byte>(accumulated.size, repeat: 0)
+                    for (i in 0..accumulated.size) { raw[i] = accumulated[i] }
+                    let text = String.fromUtf8(raw)
+                    let lines = text.split("\n")
+                    accumulated.clear()
+                    for (line in lines) {
+                        if (line.startsWith("data: ")) {
+                            let content = line[6..]
+                            if (!content.startsWith("{") && !content.startsWith("[")) { continue }
+                            let bytes = content.toArray()
+                            let result = Array<Byte>(bytes.size + 1, repeat: 0)
+                            for (i in 0..bytes.size) { result[i] = bytes[i] }
+                            result[bytes.size] = 10
+                            synchronized(this.lock) {
+                                this.responseQueue.add(result)
+                                this.cond.notifyAll()
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) { }
     }
 
     public func setCustomHeaders(headers: HashMap<String, String>): Unit {
         for ((k, v) in headers) { this.customHeaders.add(k, v) }
-    }
-
-    public func setToolParamHeaders(toolName: String, mappings: HashMap<String, String>): Unit {
-        this.toolParamHeaders.add(toolName, mappings)
     }
 
     public func send(data: Array<Byte>): Unit {
@@ -38,51 +92,10 @@ public class StatelessHttpClientTransport <: Transport {
             .url(this.endpointUrl)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", "2026-07-28")
+            .header("MCP-Protocol-Version", "2025-11-25")
         for ((k, v) in this.customHeaders) { builder.header(k, v) }
-
-        // Auto-attach Mcp-Method and Mcp-Name headers, plus x-mcp-header params
-        let jv = try { Option<JsonValue>.Some(JsonValue.parse(json)) } catch (_: Exception) { Option<JsonValue>.None }
-        match (jv) {
-            case Some(v) =>
-                let methodStr = match (v["method"]) {
-                    case Some(JsonValue.String(m)) => m
-                    case _ => ""
-                }
-                if (methodStr != "") { builder.header("Mcp-Method", methodStr) }
-
-                match (v["params"]) {
-                    case Some(JsonValue.Map(p)) =>
-                        let nameVal = match (p.get("name")) {
-                            case Some(JsonValue.String(n)) => n
-                            case _ => match (p.get("uri")) {
-                                case Some(JsonValue.String(u)) => u
-                                case _ => ""
-                            }
-                        }
-                        if (nameVal != "") { builder.header("Mcp-Name", nameVal) }
-
-                        // x-mcp-header: map params to Mcp-Param-{Name} headers
-                        if (methodStr == "tools/call" && nameVal != "") {
-                            let mappings = this.toolParamHeaders.get(nameVal)
-                            if (let Some(m) <- mappings) {
-                                match (p.get("arguments")) {
-                                    case Some(JsonValue.Map(args)) =>
-                                        for ((argName, argVal) in m) {
-                                            match (args.get(argName)) {
-                                                case Some(v) =>
-                                                    let headerVal = this.encodeParamValue(v)
-                                                    builder.header("Mcp-Param-${argVal}", headerVal)
-                                                case None => ()
-                                            }
-                                        }
-                                    case _ => ()
-                                }
-                            }
-                        }
-                    case _ => ()
-                }
-            case None => ()
+        if (this.sessionId != "") {
+            builder.header("Mcp-Session-Id", this.sessionId)
         }
 
         let req = builder.body(json).post().build()
@@ -90,15 +103,17 @@ public class StatelessHttpClientTransport <: Transport {
             let resp = this.client.send(req)
             let contentType = resp.headers.getFirst("content-type") ?? ""
 
+            if (let Some(sid) <- resp.headers.getFirst("Mcp-Session-Id")) {
+                this.sessionId = sid
+            }
+
             if (resp.status == 202) { return }
 
             if (contentType.startsWith("text/event-stream")) {
-                // SSE response — read in background
                 spawn { => this.readSseStream(resp.body) }
                 return
             }
 
-            // JSON response
             let body = this.readBody(resp.body)
             let result = Array<Byte>(body.size + 1, repeat: 0)
             for (i in 0..body.size) { result[i] = body[i] }
@@ -112,36 +127,6 @@ public class StatelessHttpClientTransport <: Transport {
         }
     }
 
-    private func encodeParamValue(v: JsonValue): String {
-        let raw = match (v) {
-            case JsonValue.String(s) => s
-            case JsonValue.Number(n) => n.toString()
-            case JsonValue.Boolean(b) => if (b) { "true" } else { "false" }
-            case JsonValue.Null => "null"
-            case _ => ""
-        }
-        if (this.needsBase64Encoding(raw)) {
-            let utf8 = raw.toArray()
-            let b64 = toBase64String(utf8)
-            return "=?base64?${b64}?="
-        }
-        raw
-    }
-
-    private func needsBase64Encoding(s: String): Bool {
-        // Empty or starts/ends with sentinel pattern
-        if (s == "") { return false }
-        if (s.startsWith("=?base64?") && s.endsWith("?=")) { return true }
-        // Leading or trailing whitespace
-        if (s != s.trimStart() || s != s.trimEnd()) { return true }
-        // Check for non-ASCII or control characters
-        for (c in s.toRuneArray()) {
-            let val = UInt32(c)
-            if (val < 32 || val > 126) { return true }
-        }
-        false
-    }
-
     private func readSseStream(body: InputStream): Unit {
         try {
             let buf = Array<Byte>(1, repeat: 0)
@@ -150,23 +135,18 @@ public class StatelessHttpClientTransport <: Transport {
                 let n: Int64
                 try {
                     n = body.read(buf)
-                } catch (_: Exception) {
-                    break
-                }
+                } catch (_: Exception) { break }
                 if (n <= 0) { break }
                 accumulated.add(buf[0])
                 let size = accumulated.size
                 if (size >= 2 &&
                     accumulated[size - 2] == 10 &&
                     accumulated[size - 1] == 10) {
-                    // Complete SSE event — parse data: lines
                     let raw = Array<Byte>(accumulated.size, repeat: 0)
                     for (i in 0..accumulated.size) { raw[i] = accumulated[i] }
                     let text = String.fromUtf8(raw)
                     let lines = text.split("\n")
                     accumulated.clear()
-
-                    // Skip comment lines (starting with ':') and empty lines
                     for (line in lines) {
                         if (line.startsWith("data: ")) {
                             let content = line[6..]
@@ -179,13 +159,10 @@ public class StatelessHttpClientTransport <: Transport {
                                 this.cond.notifyAll()
                             }
                         }
-                        // Comment lines (starting with ':') are keep-alive, skip
                     }
                 }
             }
-        } catch (_: Exception) {
-            // Stream closed
-        }
+        } catch (_: Exception) { }
     }
 
     private func readBody(body: InputStream): Array<Byte> {
@@ -195,9 +172,7 @@ public class StatelessHttpClientTransport <: Transport {
             let n: Int64
             try {
                 n = body.read(buf)
-            } catch (_: Exception) {
-                break
-            }
+            } catch (_: Exception) { break }
             if (n <= 0) { break }
             total.add(all: buf[0..n])
         }

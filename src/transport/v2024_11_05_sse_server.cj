@@ -9,7 +9,7 @@ import sonyflake.*
 
 let sonyflake = Sonyflake(Setting(Random().nextUInt16()))
 
-public class HttpSseServerTransport <: Transport {
+public class HttpSseServer_2024_11_05 <: Transport {
     private let messageQueue = ArrayList<Array<Byte>>()
     private let lock = Mutex()
     private let recvCond: Condition

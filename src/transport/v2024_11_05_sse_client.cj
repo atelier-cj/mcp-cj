@@ -5,7 +5,7 @@ import stdx.net.http.*
 import std.io.InputStream
 import std.collection.ArrayList
 
-public class HttpSseClientTransport <: Transport {
+public class HttpSseClient_2024_11_05 <: Transport {
     private let baseUrl: String
     private let client: Client
     private var sessionId: String = ""

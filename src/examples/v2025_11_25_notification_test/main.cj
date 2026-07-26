@@ -1,4 +1,4 @@
-package mcp.examples.notification_test
+package mcp.examples.v2025_11_25_notification_test
 
 import jsonvalue.*
 import mcp.*
@@ -51,7 +51,7 @@ main() {
         }
     })
 
-    let transport = SessionHttpServerTransport()
+    let transport = StreamableHttpServer_2025_11_25()
     transport.registerRoutes(server.distributor)
 
     let mcpServer = McpServer("notif-test-server", "1.0.0", transport)
@@ -106,7 +106,7 @@ main() {
     let baseUrl = "http://127.0.0.1:${portHolder.value}"
     println("Server started at ${baseUrl}")
 
-    let client = McpClient(SessionHttpClientTransport(baseUrl))
+    let client = McpClient(StreamableHttpClient_2025_11_25(baseUrl))
     let info = Implementation("notif-test-client", "1.0.0")
 
     // Register client-side notification callback (receiving Server→Client notifications)
