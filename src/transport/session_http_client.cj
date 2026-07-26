@@ -3,7 +3,7 @@ package mcp.transport
 import ystyle::jsonrpc.*
 import stdx.net.http.*
 import std.io.InputStream
-import std.collection.ArrayList
+import std.collection.{ArrayList, HashMap}
 
 public class SessionHttpClientTransport <: Transport {
     private let baseUrl: String
@@ -11,16 +11,38 @@ public class SessionHttpClientTransport <: Transport {
     private var sessionId: String = ""
     private let sseBody: InputStream
     private var closed: Bool = false
+    private let customHeaders = HashMap<String, String>()
+
+    public init(baseUrl: String, headers: HashMap<String, String>) {
+        this.baseUrl = baseUrl.trimEnd('/')
+        this.client = ClientBuilder().build()
+        for ((k, v) in headers) { this.customHeaders.add(k, v) }
+        let builder = HttpRequestBuilder()
+            .url(this.baseUrl)
+            .header("Accept", "text/event-stream")
+        for ((k, v) in this.customHeaders) { builder.header(k, v) }
+        let req = builder.get().build()
+        let resp = this.client.send(req)
+        this.sseBody = resp.body
+        let id = this.readSessionId()
+        if (let Some(sid) <- id) {
+            this.sessionId = sid
+        }
+    }
 
     public init(baseUrl: String) {
         this.baseUrl = baseUrl.trimEnd('/')
         this.client = ClientBuilder().build()
-        let sseResp = this.client.get(this.baseUrl + "/")
+        let sseResp = this.client.get(this.baseUrl)
         this.sseBody = sseResp.body
         let id = this.readSessionId()
         if (let Some(sid) <- id) {
             this.sessionId = sid
         }
+    }
+
+    public func setCustomHeaders(headers: HashMap<String, String>): Unit {
+        for ((k, v) in headers) { this.customHeaders.add(k, v) }
     }
 
     private func readSessionId(): ?String {
@@ -58,13 +80,14 @@ public class SessionHttpClientTransport <: Transport {
 
     public func send(data: Array<Byte>): Unit {
         let json = String.fromUtf8(data[0..data.size - 1])
-        let url = this.baseUrl + "/?session_id=" + this.sessionId
-        let req = HttpRequestBuilder()
+        let url = this.baseUrl + "?session_id=" + this.sessionId
+        let builder = HttpRequestBuilder()
             .url(url)
             .header("content-type", "application/json")
             .body(json)
             .post()
-            .build()
+        for ((k, v) in this.customHeaders) { builder.header(k, v) }
+        let req = builder.build()
         try {
             let resp = this.client.send(req)
             if (resp.status != 200) {

@@ -16,11 +16,16 @@ public class StatelessHttpClientTransport <: Transport {
     private let cond: Condition
     private var closed: Bool = false
     private let toolParamHeaders = HashMap<String, HashMap<String, String>>()
+    private let customHeaders = HashMap<String, String>()
 
     public init(endpointUrl: String) {
         this.endpointUrl = endpointUrl.trimEnd('/')
         this.client = ClientBuilder().build()
         this.cond = synchronized(this.lock) { this.lock.condition() }
+    }
+
+    public func setCustomHeaders(headers: HashMap<String, String>): Unit {
+        for ((k, v) in headers) { this.customHeaders.add(k, v) }
     }
 
     public func setToolParamHeaders(toolName: String, mappings: HashMap<String, String>): Unit {
@@ -30,10 +35,11 @@ public class StatelessHttpClientTransport <: Transport {
     public func send(data: Array<Byte>): Unit {
         let json = String.fromUtf8(data[0..data.size - 1])
         let builder = HttpRequestBuilder()
-            .url(this.endpointUrl + "/")
+            .url(this.endpointUrl)
             .header("content-type", "application/json")
             .header("accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", "2026-07-28")
+        for ((k, v) in this.customHeaders) { builder.header(k, v) }
 
         // Auto-attach Mcp-Method and Mcp-Name headers, plus x-mcp-header params
         let jv = try { Option<JsonValue>.Some(JsonValue.parse(json)) } catch (_: Exception) { Option<JsonValue>.None }
