@@ -172,11 +172,17 @@ public class StatelessHttpServerTransport <: Transport {
 
             // Keep SSE open until response arrives or timeout
             try {
-                for (_ in 0..600) {
+                var keepAliveCounter = 0
+                for (_ in 0..300) {
                     synchronized(this.lock) {
                         if (stream.closed) { break }
                     }
-                    sleep(500 * Duration.millisecond)
+                    sleep(Duration.second)
+                    keepAliveCounter++
+                    if (keepAliveCounter >= 15) {
+                        keepAliveCounter = 0
+                        writer.write((":\r\n").toArray())
+                    }
                 }
             } catch (_: Exception) { }
             synchronized(this.lock) {
@@ -314,7 +320,7 @@ public class StatelessHttpServerTransport <: Transport {
             return false
         }
         let accept = ctx.request.headers.getFirst("Accept") ?? ""
-        if (!accept.contains("application/json") && !accept.contains("text/event-stream")) {
+        if (!accept.contains("application/json") || !accept.contains("text/event-stream")) {
             ctx.responseBuilder.status(400).body("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32002,\"message\":\"Accept header must include application/json and text/event-stream\"}}")
             return false
         }
@@ -408,18 +414,25 @@ public class StatelessHttpServerTransport <: Transport {
                         }
                         match (token) {
                             case Some(t) =>
-                                synchronized(this.lock) {
+                                let writers = synchronized(this.lock) {
+                                    let list = ArrayList<HttpResponseWriter>()
                                     for (stream in this.requestStreams) {
                                         if (!stream.closed && stream.matchesToken(t)) {
-                                            stream.writer.write(("data: " + json + "\n\n").toArray())
+                                            list.add(stream.writer)
                                         }
                                     }
+                                    list
+                                }
+                                for (w in writers) {
+                                    w.write(("data: " + json + "\n\n").toArray())
                                 }
                                 return
                             case None => ()
                         }
                     }
 
+                    let subWriters = ArrayList<HttpResponseWriter>()
+                    let subPayloads = ArrayList<Array<Byte>>()
                     synchronized(this.lock) {
                         var i = 0
                         while (i < this.subscriptions.size) {
@@ -431,11 +444,15 @@ public class StatelessHttpServerTransport <: Transport {
                             if (sub.filter.accepts(methodStr)) {
                                 let bytes = this.injectSubscriptionId(msg, sub.id)
                                 if (let Some(b) <- bytes) {
-                                    sub.writer.write(("data: " + String.fromUtf8(b) + "\n\n").toArray())
+                                    subWriters.add(sub.writer)
+                                    subPayloads.add(b)
                                 }
                             }
                             i++
                         }
+                    }
+                    for (idx in 0..subWriters.size) {
+                        subWriters[idx].write(("data: " + String.fromUtf8(subPayloads[idx]) + "\n\n").toArray())
                     }
                     return
                 }
@@ -446,14 +463,15 @@ public class StatelessHttpServerTransport <: Transport {
                         case Some(JsonValue.String(s)) => s
                         case _ => ""
                     }
+                    var found = false
+                    var sseWriter: Option<HttpResponseWriter> = None
                     synchronized(this.lock) {
-                        var found = false
                         if (respId != "") {
                             var i = 0
                             while (i < this.requestStreams.size) {
                                 let s = this.requestStreams[i]
                                 if (s.requestId == respId && !s.closed) {
-                                    s.writer.write(("data: " + json + "\n\n").toArray())
+                                    sseWriter = Option.Some(s.writer)
                                     s.closed = true
                                     this.requestStreams.remove(at: i)
                                     found = true
@@ -466,6 +484,9 @@ public class StatelessHttpServerTransport <: Transport {
                             this.pendingResponse = Some(json.toArray())
                             this.respCond.notifyAll()
                         }
+                    }
+                    if (let Some(w) <- sseWriter) {
+                        w.write(("data: " + json + "\n\n").toArray())
                     }
                 }
             case None => ()
