@@ -203,5 +203,5 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
     }
 }
 
-type SessionHttpClientTransport = StreamableHttpClient_2025_11_25
+public type SessionHttpClientTransport = StreamableHttpClient_2025_11_25
 

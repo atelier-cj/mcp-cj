@@ -564,4 +564,4 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
     }
 }
 
-type StatelessHttpServerTransport = StatelessHttpServer_2026_07_28
+public type StatelessHttpServerTransport = StatelessHttpServer_2026_07_28

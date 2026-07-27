@@ -121,5 +121,5 @@ public class HttpSseClient_2024_11_05 <: Transport {
     }
 }
 
-type HttpSseClientTransport = HttpSseClient_2024_11_05
+public type HttpSseClientTransport = HttpSseClient_2024_11_05
 

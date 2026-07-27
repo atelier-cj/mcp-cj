@@ -65,7 +65,8 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
 
     private func handlePost(ctx: HttpContext): Unit {
         // Validate MCP-Protocol-Version header
-        if (ctx.request.headers.getFirst("MCP-Protocol-Version").isNone()) {
+        if (ctx.request.headers.getFirst("MCP-Protocol-Version").isNone() &&
+            ctx.request.headers.getFirst("Mcp-Method").isSome()) {
             ctx.responseBuilder.status(400).header("content-type", "text/plain").body("Missing MCP-Protocol-Version header")
             return
         }
@@ -182,5 +183,5 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
     }
 }
 
-type SessionHttpServerTransport = StreamableHttpServer_2025_11_25
+public type SessionHttpServerTransport = StreamableHttpServer_2025_11_25
 

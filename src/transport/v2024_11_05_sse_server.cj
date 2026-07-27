@@ -128,4 +128,4 @@ public class HttpSseServer_2024_11_05 <: Transport {
     }
 }
 
-type HttpSseServerTransport = HttpSseServer_2024_11_05
+public type HttpSseServerTransport = HttpSseServer_2024_11_05

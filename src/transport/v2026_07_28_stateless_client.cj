@@ -228,5 +228,5 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
     }
 }
 
-type StatelessHttpClientTransport = StatelessHttpClient_2026_07_28
+public type StatelessHttpClientTransport = StatelessHttpClient_2026_07_28
 
