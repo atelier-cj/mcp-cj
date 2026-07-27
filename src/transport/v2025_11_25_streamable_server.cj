@@ -181,3 +181,6 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
         }
     }
 }
+
+type SessionHttpServerTransport = StreamableHttpServer_2025_11_25
+

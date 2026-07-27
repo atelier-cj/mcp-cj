@@ -227,3 +227,6 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
         this.client.close()
     }
 }
+
+type StatelessHttpClientTransport = StatelessHttpClient_2026_07_28
+

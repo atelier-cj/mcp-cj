@@ -419,8 +419,8 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
                                     for (stream in this.requestStreams) {
                                         if (!stream.closed && stream.matchesToken(t)) {
                                             list.add(stream.writer)
-                                        }
-                                    }
+    }
+}
                                     list
                                 }
                                 for (w in writers) {
@@ -478,8 +478,9 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
                                     break
                                 }
                                 i++
-                            }
-                        }
+    }
+}
+
                         if (!found && this.waitingForResponse) {
                             this.pendingResponse = Some(json.toArray())
                             this.respCond.notifyAll()
@@ -562,3 +563,5 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
         }
     }
 }
+
+type StatelessHttpServerTransport = StatelessHttpServer_2026_07_28

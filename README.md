@@ -117,13 +117,15 @@ client.close()
 |------|------|
 | `StdioServerTransport` | 标准输入输出传输（服务端） |
 | `StdioClientTransport` | 标准输入输出传输（客户端，subprocess） |
-| `HttpSseServer_2024_11_05` | HTTP+SSE 传输（服务端，2024-11-05 旧版，已废弃） |
-| `HttpSseClient_2024_11_05` | HTTP+SSE 传输（客户端） |
-| `StreamableHttpServer_2025_11_25` | Streamable HTTP 传输（服务端，2025-11-25，带 session） |
-| `StreamableHttpClient_2025_11_25` | Streamable HTTP 传输（客户端） |
-| `StatelessHttpServer_2026_07_28` | Streamable HTTP 传输（服务端，2026-07-28，无 session） |
-| `StatelessHttpClient_2026_07_28` | Streamable HTTP 传输（客户端） |
+| `SessionHttpServerTransport` | **推荐** Streamable HTTP (2025-11-25，带 session)，支持 opencode / Cherry Studio / Inspector |
+| `SessionHttpClientTransport` | Streamable HTTP 客户端 |
+| `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28，无 session，支持 subscriptions/listen) |
+| `StatelessHttpClientTransport` | Streamable HTTP 客户端 |
+| `HttpSseServerTransport` | HTTP+SSE (2024-11-05，已废弃) |
+| `HttpSseClientTransport` | HTTP+SSE 客户端 |
 | `Transport` 接口 | 自定义传输实现 |
+
+> 以上名称是类型别名（`type` alias），对应的具体实现类名为 `StreamableHttpServer_2025_11_25`、`StatelessHttpServer_2026_07_28` 等。推荐使用别名，便于未来协议升级时迁移。
 
 ### 使用 Streamable HTTP Transport (2025-11-25 Session)
 
@@ -135,7 +137,7 @@ import stdx.net.http.*
 let httpServer = ServerBuilder()
     .addr("127.0.0.1").port(8080).build()
 
-let transport = StreamableHttpServer_2025_11_25()
+let transport = SessionHttpServerTransport()
 transport.registerRoutes(httpServer.distributor)
 
 let server = McpServer("my-server", "1.0.0", transport)
@@ -147,7 +149,7 @@ httpServer.serve()
 客户端（连接上述服务端）：
 
 ```cangjie
-let client = McpClient(StreamableHttpClient_2025_11_25("http://127.0.0.1:8080"))
+let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 ```
 
 ### 协议支持
@@ -196,9 +198,9 @@ let client = McpClient(StreamableHttpClient_2025_11_25("http://127.0.0.1:8080"))
 
 | 版本 | Transport | 状态 |
 |------|-----------|------|
-| **2026-07-28** | `StatelessHttpServer_2026_07_28` / `StatelessHttpClient_2026_07_28` | RC，最新协议 |
-| **2025-11-25** | `StreamableHttpServer_2025_11_25` / `StreamableHttpClient_2025_11_25` | Latest，**推荐** |
-| 2024-11-05 | `HttpSseServer_2024_11_05` / `HttpSseClient_2024_11_05` | 已废弃 |
+| **2026-07-28** | `StatelessHttpServerTransport` / `StatelessHttpClientTransport` | RC，最新协议 |
+| **2025-11-25** | `SessionHttpServerTransport` / `SessionHttpClientTransport` | Latest，**推荐** |
+| 2024-11-05 | `HttpSseServerTransport` / `HttpSseClientTransport` | 已废弃 |
 
 兼容版本：2025-06-18, 2025-03-26, 2024-10-07
 
@@ -207,9 +209,9 @@ let client = McpClient(StreamableHttpClient_2025_11_25("http://127.0.0.1:8080"))
 | Transport | 适用场景 |
 |-----------|----------|
 | `StdioServerTransport` | 本地子进程模式，最通用 |
-| `StreamableHttpServer_2025_11_25` | **推荐** Streamable HTTP (2025-11-25)，支持 opencode / Cherry Studio / Inspector |
-| `StatelessHttpServer_2026_07_28` | Streamable HTTP (2026-07-28)，最新协议，无 session，支持 subscriptions/listen |
-| `HttpSseServer_2024_11_05` | 已废弃的 HTTP+SSE 旧协议 (2024-11-05)，仅用于兼容老客户端 |
+| `SessionHttpServerTransport` | **推荐** Streamable HTTP (2025-11-25)，支持 opencode / Cherry Studio / Inspector |
+| `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28)，最新协议，无 session，支持 subscriptions/listen |
+| `HttpSseServerTransport` | 已废弃的 HTTP+SSE 旧协议 (2024-11-05)，仅用于兼容老客户端 |
 
 ## License
 

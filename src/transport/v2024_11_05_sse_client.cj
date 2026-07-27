@@ -120,3 +120,6 @@ public class HttpSseClient_2024_11_05 <: Transport {
         this.client.close()
     }
 }
+
+type HttpSseClientTransport = HttpSseClient_2024_11_05
+

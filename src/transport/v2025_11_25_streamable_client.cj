@@ -202,3 +202,6 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
         this.client.close()
     }
 }
+
+type SessionHttpClientTransport = StreamableHttpClient_2025_11_25
+
