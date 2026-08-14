@@ -1,7 +1,7 @@
 [dependencies]
   "sonyflake" = "1.0.9"
-  "jsonvalue" = "1.0.1"
-  "ystyle::jsonrpc" = "0.4.1"
+  "jsonvalue" = "1.1.0"
+  "ystyle::jsonrpc" = "0.4.2"
 
 [package]
   cjc-version = "1.1.0"
@@ -13,7 +13,7 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.3.2"
+  version = "2.3.3"
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
