@@ -1,7 +1,7 @@
 [dependencies]
   "sonyflake" = "1.0.9"
   "jsonvalue" = "1.1.0"
-  "ystyle::jsonrpc" = "0.4.2"
+  "ystyle::jsonrpc" = "0.7.1"
 
 [package]
   cjc-version = "1.1.0"
@@ -13,7 +13,10 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.3.3"
+  version = "2.3.4"
+  license = ["MulanPSL-2.0"]
+  authors = ["ystyle"]
+  repository = "https://atomgit.com/ystyle/mcp-cj"
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
