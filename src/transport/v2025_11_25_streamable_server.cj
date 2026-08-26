@@ -56,6 +56,15 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
             this.sseWriter = Some(writer)
         }
 
+        // 立即写一个 SSE 注释行：触发首次写入（提交 200 + SSE 响应头）。
+        // 否则客户端永远收不到响应头（健康服务器下 handleSSE 阻塞在等待循环里），
+        // 官方 MCP 客户端/Inspector 无法建立 SSE 通道。
+        try {
+            writer.write(": mcp connected\n\n".toArray())
+        } catch (_: Exception) {
+            // 连接刚建立即失败：忽略，后续由 send() 清理陈旧 writer
+        }
+
         synchronized(this.lock) {
             while (!this.closed) {
                 this.sseCond.wait()
@@ -147,7 +156,14 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
                 this.respCond.notifyAll()
             } else if (let Some(writer) <- this.sseWriter) {
                 let event = "data: " + json + "\n\n"
-                writer.write(event.toArray())
+                // 陈旧 SSE 连接写失败（客户端已断开）：清理该 writer，绝不把异常抛给调用方。
+                // 否则单次断连会经 handleMessage → close() 杀死整个服务器的接收循环，
+                // 表现为后续所有请求瞬时 {"error":"timeout"}（需要重启才恢复）。
+                try {
+                    writer.write(event.toArray())
+                } catch (_: Exception) {
+                    this.sseWriter = None
+                }
             }
         }
     }
