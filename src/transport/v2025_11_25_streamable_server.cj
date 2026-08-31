@@ -29,17 +29,24 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
     }
 
     public func registerRoutes(distributor: HttpRequestDistributor): Unit {
-        distributor.register("/", { ctx =>
-            if (ctx.request.method == "GET") {
-                this.handleSSE(ctx)
-            } else if (ctx.request.method == "POST") {
-                this.handlePost(ctx)
-            } else if (ctx.request.method == "DELETE") {
-                this.handleDelete(ctx)
-            } else {
-                ctx.responseBuilder.status(405).header("content-type", "text/plain").body("Method not allowed")
-            }
-        })
+        distributor.register("/", { ctx => this.handle(ctx) })
+    }
+
+    // 单一入口 handler（与 UI 等合并单端口时直接分发：POST/DELETE → MCP，其余交给外层）
+    public func asHandler(): HttpRequestHandler {
+        FuncHandler({ ctx => this.handle(ctx) })
+    }
+
+    private func handle(ctx: HttpContext): Unit {
+        if (ctx.request.method == "GET") {
+            this.handleSSE(ctx)
+        } else if (ctx.request.method == "POST") {
+            this.handlePost(ctx)
+        } else if (ctx.request.method == "DELETE") {
+            this.handleDelete(ctx)
+        } else {
+            ctx.responseBuilder.status(405).header("content-type", "text/plain").body("Method not allowed")
+        }
     }
 
     private func handleSSE(ctx: HttpContext): Unit {
