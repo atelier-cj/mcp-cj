@@ -21,8 +21,13 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
     private var pendingResponse: ?Array<Byte> = None
     private var waitingForResponse: Bool = false
     private var closed: Bool = false
+    // SSE 长连接心跳间隔：周期写 SSE 注释行探测对端活性。客户端断开后写失败 →
+    // 清理陈旧 writer 并退出 handleSSE，http 层随即回收连接（否则 SSE 连接永不
+    // 退出 = CLOSE_WAIT/fd 泄漏 → 内存持续增长 → 生产写路径 OOM 诱因）。
+    private let heartbeatInterval: Duration
 
-    public init() {
+    public init(heartbeatInterval!: Duration = Duration.second * 30) {
+        this.heartbeatInterval = heartbeatInterval
         this.recvCond = synchronized(this.lock) { this.lock.condition() }
         this.sseCond = synchronized(this.lock) { this.lock.condition() }
         this.respCond = synchronized(this.lock) { this.lock.condition() }
@@ -72,9 +77,42 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
             // 连接刚建立即失败：忽略，后续由 send() 清理陈旧 writer
         }
 
-        synchronized(this.lock) {
-            while (!this.closed) {
-                this.sseCond.wait()
+        // 等待循环：close() 唤醒退出；心跳间隔超时则写一个 SSE 注释行探测对端
+        // 活性——客户端断开后写失败，清理 writer 并退出，http 层回收连接
+        // （修复：SSE 长连接原先无限阻塞在 sseCond.wait()，对端断开后无人 close，
+        // CLOSE_WAIT/fd 累积 → 内存增长 → 生产写路径 OOM）。
+        var sseAlive = true
+        while (sseAlive) {
+            var timedOut = false
+            synchronized(this.lock) {
+                if (this.closed) {
+                    sseAlive = false
+                } else {
+                    let woke = this.sseCond.wait(timeout: this.heartbeatInterval)
+                    if (this.closed) {
+                        sseAlive = false
+                    } else if (!woke) {
+                        // 超时未唤醒：跳出做心跳探测（锁外写，避免持锁 IO）
+                        timedOut = true
+                    }
+                }
+            }
+            if (!sseAlive) { break }
+            if (!timedOut) { continue }
+            // 锁外心跳写：写失败 = 对端已断开，清理陈旧 writer 退出
+            synchronized(this.lock) {
+                match (this.sseWriter) {
+                    case Some(w) =>
+                        try {
+                            w.write(": ping\n\n".toArray())
+                        } catch (_: Exception) {
+                            this.sseWriter = None
+                            sseAlive = false
+                        }
+                    case None =>
+                        // writer 已被 send() 清理（写失败过）：连接已断，退出
+                        sseAlive = false
+                }
             }
         }
     }
@@ -194,6 +232,12 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
 
     public func isClosed(): Bool {
         synchronized(this.lock) { this.closed }
+    }
+
+    // 当前是否有活跃 SSE 连接（运维监控/测试用：SSE 长连接泄漏排查，
+    // 见 handleSSE 心跳注释——对端断开后 writer 被清理，此处转 false）
+    public func hasActiveSse(): Bool {
+        synchronized(this.lock) { this.sseWriter.isSome() }
     }
 
     public func close(): Unit {
