@@ -230,7 +230,7 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 |---|---|---|
 | `StatelessHttpServer_2026_07_28` 的**请求级 SSE** 路径按客户端 `id` 配对（`requestStreams` + `respId`）：同 id 的多个流按**注册顺序 FIFO** 配对，正确性依赖「响应按请求顺序产生」这条不变式（接收循环单条串行 + 同步 handler；`registerAsync*` 一旦被使用该不变式即被打破） | 仅"同一时刻两个客户端共用同一 `id`"且响应**乱序完成**的场景 | **已收敛**：①「按 id 批量摘流」的**跨客户端误杀**已修（每条流分配身份 token，只摘自己，回归测试 `src/stateless_request_sse_test.cj`）；② 剩余依赖已作为显式不变式写进上面的「并发语义」小节，不再是隐性假设 |
 | 依赖库 `json-rpc` 的 `JsonRpcServer.handleOutgoingResponse` 曾用**单个** `pendingRequest`（服务端 → 客户端方向，如 sampling / elicitation） | 服务端并发向同一客户端发请求时会丢响应/串台 | **已在 json-rpc 侧修复**（`pendingRequests: HashMap<RequestId, PendingRequest>` + 自增 id；json-rpc 0.7.5 待发）。下游 acp-cj 为绕开该限制而加的 `clientRequestLock` **待 json-rpc 0.7.5 发布后再撤**（否则会退回用注册表 0.7.4 的旧行为） |
-| v2.3.9 已在本地 `master`（`f30cadc`），**未推送远程、未发布中心仓** | 用 registry 版本依赖的项目拿不到本次修复 | **待定**（发布不可逆，需人工确认后执行） |
+| v2.3.9 已发布中心仓（2026-09-13，tag `v2.3.9`） | 依赖方把 `mcp` 升到 `2.3.9` 即可拿到并发响应路由、stateless 防御性修复与请求级 SSE 按身份清理 | **已完成**。仍用 registry 版本依赖的项目：jisi-pavilion（2.3.8）、atelier（2.3.7）升级后生效 |
 
 ## License
 
