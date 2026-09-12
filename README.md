@@ -213,6 +213,24 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 | `StatelessHttpServerTransport` | Streamable HTTP (2026-07-28)，最新协议，无 session，支持 subscriptions/listen |
 | `HttpSseServerTransport` | 已废弃的 HTTP+SSE 旧协议 (2024-11-05)，仅用于兼容老客户端 |
 
+### 并发语义（HTTP 服务端传输）
+
+- **支持并发请求**：响应按 JSON-RPC `id` 路由，每个在飞请求一个等待槽；同一 `id` 的多个在飞请求按到达顺序（FIFO）各自配对 —— 这同时覆盖了「多个客户端各自从 id=1 计数」的撞车场景。
+- **等待有界**：单个请求等待超过 `requestTimeout`（构造参数，默认 5 分钟）即返回**带原请求 `id` 的显式 JSON-RPC 错误**（`-32001`），不会永久挂住；`close()` 会立即唤醒全部在飞请求。
+- **通知**（无 `id`）会入队交给服务端处理，但按 JSON-RPC 不应答。
+- 响应无法匹配到等待槽时（服务端主动通知，或 `id:null` 的错误响应），才回退到 SSE 长连接、否则丢弃。
+- 运维观测：`pendingCount()` 返回当前在飞请求数。
+
+> **背景（2026-09-12，v2.3.9）**：修复前服务端用「单个共享 `waitingForResponse` 标志 + 单个 `pendingResponse` 槽位」承载响应，而 HTTP 每连接一个 handler 协程 —— 并发请求的响应会被**静默丢弃**，且等待循环永不退出（30s 超时后只是重新 `wait`）。表现为**并发请求 100% 挂死、顺序请求约 5~7% 挂死**，且挂住的请求其实**已经执行**（客户端超时重试 → 重复写）。回归测试 `src/streamable_concurrency_test.cj` 覆盖此场景（**该测试在旧实现下必然失败**）。
+
+## 已知问题 / 待办
+
+| 项 | 影响面 | 状态 |
+|---|---|---|
+| `StatelessHttpServer_2026_07_28` 的**请求级 SSE** 路径按客户端 `id` 匹配（`requestStreams` + `respId`），跨客户端 `id` 撞车时可能误投递 | 仅"同一时刻两个客户端共用同一 `id`"的场景；顺序或正常客户端不受影响 | **待评估**（需按连接/请求命名空间化）。注：该传输的"无 SSE"同步分支对合规客户端**不可达**（`validatePreHeaders` 强制 Accept 含 `text/event-stream`），已作防御性修复 |
+| 依赖库 `json-rpc` 的 `JsonRpcServer.handleOutgoingResponse` 仍用**单个** `pendingRequest`（服务端 → 客户端方向，如 sampling / elicitation） | 服务端并发向同一客户端发请求时会串响应 | **待评估**（属 json-rpc 仓库的同类模式） |
+| v2.3.9 已在本地 `master`（`f30cadc`），**未推送远程、未发布中心仓** | 用 registry 版本依赖的项目拿不到本次修复 | **待定**（发布不可逆，需人工确认后执行） |
+
 ## License
 
 MIT
