@@ -38,17 +38,22 @@ class SubscriptionEntry {
 }
 
 let nextSubId = AtomicInt64(1)
+// 请求级 SSE 流的**身份**：客户端 id 可能撞车（各客户端都从 1 开始计数），
+// 清理时必须按身份摘自己那条，绝不能按 id 摘「所有同 id 的流」——那会误杀别的客户端。
+let nextRequestStreamToken = AtomicInt64(1)
 
 class RequestSseStream {
     var writer: HttpResponseWriter
     var requestId: String
     var progressToken: ?String
+    let token: Int64
     var closed: Bool = false
 
     public init(writer: HttpResponseWriter, requestId: String, progressToken: ?String) {
         this.writer = writer
         this.requestId = requestId
         this.progressToken = progressToken
+        this.token = nextRequestStreamToken.fetchAdd(1)
     }
 
     func matchesToken(token: String): Bool {
@@ -173,9 +178,12 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
             }
 
             // Keep SSE open until response arrives or timeout
+            // 上限与 requestTimeout 对齐（默认 5 分钟），避免写死常量、也便于测试
+            let maxWaitSeconds = this.requestTimeout.toMilliseconds() / 1000
+            let maxIterations = if (maxWaitSeconds < 1) { 1 } else { maxWaitSeconds }
             try {
                 var keepAliveCounter = 0
-                for (_ in 0..300) {
+                for (_ in 0..maxIterations) {
                     synchronized(this.lock) {
                         if (stream.closed) { break }
                     }
@@ -189,11 +197,15 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
             } catch (_: Exception) { }
             synchronized(this.lock) {
                 stream.closed = true
+                // 只摘自己这一条：同 id 的其它流属于别的客户端，按 id 批量摘会误杀
+                // （被误杀的流再也收不到响应，只能干等到 SSE 上限）
                 var i = 0
                 while (i < this.requestStreams.size) {
-                    if (this.requestStreams[i].requestId == reqId) {
+                    if (this.requestStreams[i].token == stream.token) {
                         this.requestStreams.remove(at: i)
-                    } else { i++ }
+                        break
+                    }
+                    i++
                 }
             }
             return

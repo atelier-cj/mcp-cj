@@ -219,6 +219,7 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 - **等待有界**：单个请求等待超过 `requestTimeout`（构造参数，默认 5 分钟）即返回**带原请求 `id` 的显式 JSON-RPC 错误**（`-32001`），不会永久挂住；`close()` 会立即唤醒全部在飞请求。
 - **通知**（无 `id`）会入队交给服务端处理，但按 JSON-RPC 不应答。
 - 响应无法匹配到等待槽时（服务端主动通知，或 `id:null` 的错误响应），才回退到 SSE 长连接、否则丢弃。
+- **请求级 SSE（2026-07-28 stateless）**：同一 `id` 的多个流按**注册顺序 FIFO** 配对，每条流带独立身份 token（收尾只摘自己，不会误杀同 `id` 的其它客户端）。**不变式**：响应必须按请求顺序产生 —— 由「接收循环单条串行 + 同步 handler」保证；若将来使用 `registerAsync` / `registerAsyncErr`（handler 先返回、稍后回调发响应），完成顺序可能倒置，此配对即失效，需先改为按连接/请求命名空间化。
 - 运维观测：`pendingCount()` 返回当前在飞请求数。
 
 > **背景（2026-09-12，v2.3.9）**：修复前服务端用「单个共享 `waitingForResponse` 标志 + 单个 `pendingResponse` 槽位」承载响应，而 HTTP 每连接一个 handler 协程 —— 并发请求的响应会被**静默丢弃**，且等待循环永不退出（30s 超时后只是重新 `wait`）。表现为**并发请求 100% 挂死、顺序请求约 5~7% 挂死**，且挂住的请求其实**已经执行**（客户端超时重试 → 重复写）。回归测试 `src/streamable_concurrency_test.cj` 覆盖此场景（**该测试在旧实现下必然失败**）。
@@ -227,8 +228,8 @@ let client = McpClient(SessionHttpClientTransport("http://127.0.0.1:8080"))
 
 | 项 | 影响面 | 状态 |
 |---|---|---|
-| `StatelessHttpServer_2026_07_28` 的**请求级 SSE** 路径按客户端 `id` 匹配（`requestStreams` + `respId`），跨客户端 `id` 撞车时可能误投递 | 仅"同一时刻两个客户端共用同一 `id`"的场景；顺序或正常客户端不受影响 | **待评估**（需按连接/请求命名空间化）。注：该传输的"无 SSE"同步分支对合规客户端**不可达**（`validatePreHeaders` 强制 Accept 含 `text/event-stream`），已作防御性修复 |
-| 依赖库 `json-rpc` 的 `JsonRpcServer.handleOutgoingResponse` 仍用**单个** `pendingRequest`（服务端 → 客户端方向，如 sampling / elicitation） | 服务端并发向同一客户端发请求时会串响应 | **待评估**（属 json-rpc 仓库的同类模式） |
+| `StatelessHttpServer_2026_07_28` 的**请求级 SSE** 路径按客户端 `id` 配对（`requestStreams` + `respId`）：同 id 的多个流按**注册顺序 FIFO** 配对，正确性依赖「响应按请求顺序产生」这条不变式（接收循环单条串行 + 同步 handler；`registerAsync*` 一旦被使用该不变式即被打破） | 仅"同一时刻两个客户端共用同一 `id`"且响应**乱序完成**的场景 | **已收敛**：①「按 id 批量摘流」的**跨客户端误杀**已修（每条流分配身份 token，只摘自己，回归测试 `src/stateless_request_sse_test.cj`）；② 剩余依赖已作为显式不变式写进上面的「并发语义」小节，不再是隐性假设 |
+| 依赖库 `json-rpc` 的 `JsonRpcServer.handleOutgoingResponse` 曾用**单个** `pendingRequest`（服务端 → 客户端方向，如 sampling / elicitation） | 服务端并发向同一客户端发请求时会丢响应/串台 | **已在 json-rpc 侧修复**（`pendingRequests: HashMap<RequestId, PendingRequest>` + 自增 id；json-rpc 0.7.5 待发）。下游 acp-cj 为绕开该限制而加的 `clientRequestLock` **待 json-rpc 0.7.5 发布后再撤**（否则会退回用注册表 0.7.4 的旧行为） |
 | v2.3.9 已在本地 `master`（`f30cadc`），**未推送远程、未发布中心仓** | 用 registry 版本依赖的项目拿不到本次修复 | **待定**（发布不可逆，需人工确认后执行） |
 
 ## License
