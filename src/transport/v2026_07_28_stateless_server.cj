@@ -62,18 +62,20 @@ class RequestSseStream {
 public class StatelessHttpServer_2026_07_28 <: Transport {
     private let lock = Mutex()
     private let recvCond: Condition
-    private let respCond: Condition
     private let subCond: Condition
     private let messageQueue = ArrayList<Array<Byte>>()
-    private var pendingResponse: ?Array<Byte> = None
-    private var waitingForResponse: Bool = false
+    // 同步应答路径的在飞请求：JSON-RPC id → 等待队列（FIFO）。
+    // 与 StreamableHttpServer_2025_11_25 同款修复：原先用「单个 waitingForResponse 标志 +
+    // 单个 pendingResponse 槽位」，并发请求的响应会被静默丢弃，且等待循环永不退出。
+    private let pending = HashMap<String, ArrayList<PendingCall>>()
     private var closed: Bool = false
     private let subscriptions = ArrayList<SubscriptionEntry>()
     private let requestStreams = ArrayList<RequestSseStream>()
+    private let requestTimeout: Duration
 
-    public init() {
+    public init(requestTimeout!: Duration = DEFAULT_REQUEST_TIMEOUT) {
+        this.requestTimeout = requestTimeout
         this.recvCond = synchronized(this.lock) { this.lock.condition() }
-        this.respCond = synchronized(this.lock) { this.lock.condition() }
         this.subCond = synchronized(this.lock) { this.lock.condition() }
     }
 
@@ -198,23 +200,83 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
         }
 
         // Synchronous response (no SSE requested)
+        //
+        // 旧实现在此处入队并唤醒消费线程**之后**才置 waitingForResponse，消费线程可抢在
+        // 这个窗口内处理完并 send()，而 send() 只认那一个全局标志 → 响应被静默丢弃 →
+        // 等待循环（while + wait(30s)）永不退出 = 请求永久挂住。下面把「注册等待槽」与
+        // 「入队唤醒」放进同一临界区，并把等待改为有界。
+        let rawJv = match (jv) {
+            case Some(v) => v
+            case None => JsonValue.Null
+        }
+        let key = match (jsonRpcIdKey(rawJv)) {
+            case Some(k) => k
+            case None =>
+                ctx.responseBuilder.status(400).header("content-type", "text/plain").body("Invalid request id")
+                return
+        }
+        var call: ?PendingCall = None
         synchronized(this.lock) {
+            if (this.closed) {
+                ctx.responseBuilder.status(503).header("content-type", "text/plain").body("Server closed")
+                return
+            }
+            let slot = PendingCall(this.lock)
+            match (this.pending.get(key)) {
+                case Some(queue) => queue.add(slot)
+                case None =>
+                    let queue = ArrayList<PendingCall>()
+                    queue.add(slot)
+                    this.pending[key] = queue
+            }
             this.messageQueue.add(total.toArray())
             this.recvCond.notifyAll()
-            this.waitingForResponse = true
-            while (this.pendingResponse.isNone() && !this.closed) {
-                this.respCond.wait(timeout: 30 * Duration.second)
+            call = Some(slot)
+        }
+
+        let pendingCall = match (call) {
+            case Some(c) => c
+            case None => return
+        }
+        var respBytes: ?Array<Byte> = None
+        var timedOut = false
+        synchronized(this.lock) {
+            while (pendingCall.response.isNone() && !this.closed) {
+                if (!pendingCall.cond.wait(timeout: this.requestTimeout)) {
+                    timedOut = true
+                    break
+                }
             }
-            if (let Some(response) <- this.pendingResponse) {
-                this.pendingResponse = None
-                this.waitingForResponse = false
+            respBytes = pendingCall.response
+            match (this.pending.get(key)) {
+                case Some(queue) =>
+                    var idx: Int64 = -1
+                    for (i in 0..queue.size) {
+                        if (queue[i].token == pendingCall.token) {
+                            idx = i
+                            break
+                        }
+                    }
+                    if (idx >= 0) {
+                        queue.remove(at: idx)
+                    }
+                    if (queue.size == 0) {
+                        this.pending.remove(key)
+                    }
+                case None => ()
+            }
+        }
+
+        match (respBytes) {
+            case Some(b) =>
                 ctx.responseBuilder.status(200)
                     .header("content-type", "application/json")
-                    .body(String.fromUtf8(response))
-            } else {
-                this.waitingForResponse = false
-                ctx.responseBuilder.status(504).body("{\"error\":\"timeout\"}")
-            }
+                    .body(String.fromUtf8(b))
+            case None =>
+                let reason = if (timedOut) { "request timeout" } else { "server closed" }
+                ctx.responseBuilder.status(200)
+                    .header("content-type", "application/json")
+                    .body(timeoutBody(rawJv, reason))
         }
     }
 
@@ -481,9 +543,24 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
     }
 }
 
-                        if (!found && this.waitingForResponse) {
-                            this.pendingResponse = Some(json.toArray())
-                            this.respCond.notifyAll()
+                        if (!found && respId != "") {
+                            // 同步应答路径：按 id 投递给对应等待槽（FIFO 头）。
+                            // 队列而非单槽位，既支持并发，也让多客户端同 id 撞车时各自配对。
+                            match (this.pending.get(respId)) {
+                                case Some(queue) =>
+                                    if (queue.size > 0) {
+                                        let slot = queue[0]
+                                        if (slot.response.isNone()) {
+                                            slot.response = Some(json.toArray())
+                                            slot.cond.notifyAll()
+                                        }
+                                        queue.remove(at: 0)
+                                        if (queue.size == 0) {
+                                            this.pending.remove(respId)
+                                        }
+                                    }
+                                case None => ()
+                            }
                         }
                     }
                     if (let Some(w) <- sseWriter) {
@@ -558,8 +635,14 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
         synchronized(this.lock) {
             this.closed = true
             this.recvCond.notifyAll()
-            this.respCond.notifyAll()
             this.subCond.notifyAll()
+            // 唤醒全部在飞同步请求，让它们的等待循环立刻退出（否则要等到各自超时）
+            for ((_, queue) in this.pending) {
+                for (slot in queue) {
+                    slot.cond.notifyAll()
+                }
+            }
+            this.pending.clear()
         }
     }
 }
