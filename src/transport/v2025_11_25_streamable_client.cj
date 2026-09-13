@@ -43,9 +43,9 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
         } catch (e: Exception) {
             // 通知流启动失败不能静默：此后服务端通知全部收不到，
             // 而调用方只看到"通知一直不来"
-            println("[mcp] start notification stream failed: " + e.toString())
+            eprintln("[mcp] start notification stream failed: " + e.toString())
         } catch (e: Error) {
-            println("[mcp] start notification stream system error: " + e.toString())
+            eprintln("[mcp] start notification stream system error: " + e.toString())
         }
     }
 
@@ -87,9 +87,9 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
             }
         } catch (e: Exception) {
             // 流为什么结束必须可见（正常 EOF / 网络错 / 解析错）
-            println("[mcp] notification stream closed: " + e.toString())
+            eprintln("[mcp] notification stream closed: " + e.toString())
         } catch (e: Error) {
-            println("[mcp] notification stream system error: " + e.toString())
+            eprintln("[mcp] notification stream system error: " + e.toString())
         }
     }
 
@@ -175,9 +175,9 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
             }
         } catch (e: Exception) {
             // SSE 主响应流为什么结束必须可见
-            println("[mcp] SSE stream closed: " + e.toString())
+            eprintln("[mcp] SSE stream closed: " + e.toString())
         } catch (e: Error) {
-            println("[mcp] SSE stream system error: " + e.toString())
+            eprintln("[mcp] SSE stream system error: " + e.toString())
         }
     }
 

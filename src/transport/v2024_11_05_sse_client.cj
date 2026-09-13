@@ -32,7 +32,7 @@ public class HttpSseClient_2024_11_05 <: Transport {
                 n = this.sseBody.read(buf)
             } catch (e: Exception) {
                 // 读失败要留痕：否则表现为"连不上 / 收不到消息，但没有任何原因"
-                println("[mcp] sse read failed: " + e.toString())
+                eprintln("[mcp] sse read failed: " + e.toString())
                 return None
             }
             if (n <= 0) { return None }
@@ -86,7 +86,7 @@ public class HttpSseClient_2024_11_05 <: Transport {
                 n = this.sseBody.read(buf)
             } catch (e: Exception) {
                 // 读失败要留痕：否则表现为"连不上 / 收不到消息，但没有任何原因"
-                println("[mcp] sse read failed: " + e.toString())
+                eprintln("[mcp] sse read failed: " + e.toString())
                 return None
             }
             if (n <= 0) { return None }

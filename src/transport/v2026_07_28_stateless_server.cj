@@ -196,9 +196,9 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
                 }
             } catch (e: Exception) {
                 // 保活循环为什么结束必须可见（对端断开 / 写失败 / 主动关闭）
-                println("[mcp] SSE keep-alive loop ended: " + e.toString())
+                eprintln("[mcp] SSE keep-alive loop ended: " + e.toString())
             } catch (e: Error) {
-                println("[mcp] SSE keep-alive loop system error: " + e.toString())
+                eprintln("[mcp] SSE keep-alive loop system error: " + e.toString())
             }
             synchronized(this.lock) {
                 stream.closed = true
@@ -363,9 +363,9 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
             }
         } catch (e: Exception) {
             // 订阅流为什么结束必须可见（对端断开 / 写失败 / 主动关闭）
-            println("[mcp] subscription SSE stream ended: " + e.toString())
+            eprintln("[mcp] subscription SSE stream ended: " + e.toString())
         } catch (e: Error) {
-            println("[mcp] subscription SSE stream system error: " + e.toString())
+            eprintln("[mcp] subscription SSE stream system error: " + e.toString())
         }
         synchronized(this.lock) {
             entry.closed = true

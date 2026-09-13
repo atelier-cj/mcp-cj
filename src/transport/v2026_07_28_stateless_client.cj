@@ -186,9 +186,9 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
         } catch (e: Exception) {
             // 流为什么结束必须可见（正常 EOF / 网络错 / 解析错区分开），
             // 否则"收不到响应"无从排查
-            println("[mcp] stateless SSE stream closed: " + e.toString())
+            eprintln("[mcp] stateless SSE stream closed: " + e.toString())
         } catch (e: Error) {
-            println("[mcp] stateless SSE stream system error: " + e.toString())
+            eprintln("[mcp] stateless SSE stream system error: " + e.toString())
         }
     }
 
