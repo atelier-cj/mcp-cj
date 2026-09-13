@@ -114,8 +114,10 @@ public class StreamableHttpServer_2025_11_25 <: Transport {
         // 官方 MCP 客户端/Inspector 无法建立 SSE 通道。
         try {
             writer.write(": mcp connected\n\n".toArray())
-        } catch (_: Exception) {
-            // 连接刚建立即失败：忽略，后续由 send() 清理陈旧 writer
+        } catch (e: Exception) {
+            // 连接刚建立即失败：忽略，后续由 send() 清理陈旧 writer。
+            // 但仍要留日志——否则"SSE 通道建不起来"在服务端零线索
+            println("[mcp] initial SSE write failed: " + e.toString())
         }
 
         // 等待循环：close() 唤醒退出；心跳间隔超时则写一个 SSE 注释行探测对端
