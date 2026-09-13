@@ -194,7 +194,12 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
                         writer.write((":\r\n").toArray())
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                // 保活循环为什么结束必须可见（对端断开 / 写失败 / 主动关闭）
+                eprintln("[mcp] SSE keep-alive loop ended: " + e.toString())
+            } catch (e: Error) {
+                eprintln("[mcp] SSE keep-alive loop system error: " + e.toString())
+            }
             synchronized(this.lock) {
                 stream.closed = true
                 // 只摘自己这一条：同 id 的其它流属于别的客户端，按 id 批量摘会误杀
@@ -356,8 +361,11 @@ public class StatelessHttpServer_2026_07_28 <: Transport {
                 }
                 writer.write((":\r\n").toArray())
             }
-        } catch (_: Exception) {
-            // Client disconnected
+        } catch (e: Exception) {
+            // 订阅流为什么结束必须可见（对端断开 / 写失败 / 主动关闭）
+            eprintln("[mcp] subscription SSE stream ended: " + e.toString())
+        } catch (e: Error) {
+            eprintln("[mcp] subscription SSE stream system error: " + e.toString())
         }
         synchronized(this.lock) {
             entry.closed = true

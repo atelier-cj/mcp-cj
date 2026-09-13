@@ -40,7 +40,13 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
             let req = builder.get().build()
             let resp = this.client.send(req)
             spawn { => this.readNotifStream(resp.body) }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            // 通知流启动失败不能静默：此后服务端通知全部收不到，
+            // 而调用方只看到"通知一直不来"
+            eprintln("[mcp] start notification stream failed: " + e.toString())
+        } catch (e: Error) {
+            eprintln("[mcp] start notification stream system error: " + e.toString())
+        }
     }
 
     private func readNotifStream(body: InputStream): Unit {
@@ -79,7 +85,12 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
                     }
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            // 流为什么结束必须可见（正常 EOF / 网络错 / 解析错）
+            eprintln("[mcp] notification stream closed: " + e.toString())
+        } catch (e: Error) {
+            eprintln("[mcp] notification stream system error: " + e.toString())
+        }
     }
 
     public func setCustomHeaders(headers: HashMap<String, String>): Unit {
@@ -162,7 +173,12 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
                     }
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            // SSE 主响应流为什么结束必须可见
+            eprintln("[mcp] SSE stream closed: " + e.toString())
+        } catch (e: Error) {
+            eprintln("[mcp] SSE stream system error: " + e.toString())
+        }
     }
 
     private func readBody(body: InputStream): Array<Byte> {
