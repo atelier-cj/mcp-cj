@@ -4,6 +4,7 @@ import ystyle::jsonrpc.*
 import stdx.net.http.*
 import std.io.InputStream
 import std.collection.ArrayList
+import stdx_log.NoopLogger
 
 public class HttpSseClient_2024_11_05 <: Transport {
     private let baseUrl: String
@@ -14,7 +15,7 @@ public class HttpSseClient_2024_11_05 <: Transport {
 
     public init(baseUrl: String) {
         this.baseUrl = baseUrl.trimEnd('/')
-        this.client = ClientBuilder().build()
+        this.client = ClientBuilder().logger(NoopLogger()).build()
         let sseResp = this.client.get(this.baseUrl + "/sse")
         this.sseBody = sseResp.body
         let id = this.readSessionId()

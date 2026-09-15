@@ -7,6 +7,7 @@ import stdx.encoding.base64.toBase64String
 import std.io.InputStream
 import std.collection.{ArrayList, HashMap}
 import std.sync.{Mutex, Condition}
+import stdx_log.NoopLogger
 
 public class StatelessHttpClient_2026_07_28 <: Transport {
     private let endpointUrl: String
@@ -20,7 +21,7 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
 
     public init(endpointUrl: String) {
         this.endpointUrl = endpointUrl.trimEnd('/')
-        this.client = ClientBuilder().build()
+        this.client = ClientBuilder().logger(NoopLogger()).build()
         this.cond = synchronized(this.lock) { this.lock.condition() }
     }
 

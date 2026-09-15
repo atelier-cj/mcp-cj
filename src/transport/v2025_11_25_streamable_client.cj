@@ -5,6 +5,7 @@ import stdx.net.http.*
 import std.io.InputStream
 import std.collection.{ArrayList, HashMap}
 import std.sync.{Mutex, Condition}
+import stdx_log.NoopLogger
 
 public class StreamableHttpClient_2025_11_25 <: Transport {
     private let endpointUrl: String
@@ -18,7 +19,7 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
 
     public init(endpointUrl: String, headers: HashMap<String, String>) {
         this.endpointUrl = endpointUrl.trimEnd('/')
-        this.client = ClientBuilder().build()
+        this.client = ClientBuilder().logger(NoopLogger()).build()
         this.cond = synchronized(this.lock) { this.lock.condition() }
         for ((k, v) in headers) { this.customHeaders.add(k, v) }
         this.startNotifStream()
@@ -26,7 +27,7 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
 
     public init(endpointUrl: String) {
         this.endpointUrl = endpointUrl.trimEnd('/')
-        this.client = ClientBuilder().build()
+        this.client = ClientBuilder().logger(NoopLogger()).build()
         this.cond = synchronized(this.lock) { this.lock.condition() }
         this.startNotifStream()
     }

@@ -13,7 +13,7 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.3.10"
+  version = "2.3.11"
   license = ["MulanPSL-2.0"]
   authors = ["ystyle"]
   repository = "https://atomgit.com/ystyle/mcp-cj"
@@ -57,3 +57,9 @@ path-option = [ "${CANGJIE_STDX_PATH}" ]
   path-option = ["${CANGJIE_STDX_PATH}"]
 [target.x86_64-linux-ohos.bin-dependencies]
   path-option = ["${CANGJIE_STDX_PATH}"]
+[target.aarch64-unknown-linux-gnu.bin-dependencies]
+path-option = ["${CANGJIE_STDX_PATH}"]
+[target.x86_64-apple-darwin.bin-dependencies]
+path-option = ["${CANGJIE_STDX_PATH}"]
+[target.aarch64-apple-darwin.bin-dependencies]
+path-option = ["${CANGJIE_STDX_PATH}"]
