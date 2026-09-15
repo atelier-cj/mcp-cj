@@ -4,7 +4,7 @@ import ystyle::jsonrpc.*
 import stdx.net.http.*
 import std.io.InputStream
 import std.collection.ArrayList
-import stdx_log.NoopLogger
+import stdx.log.NoopLogger
 
 public class HttpSseClient_2024_11_05 <: Transport {
     private let baseUrl: String

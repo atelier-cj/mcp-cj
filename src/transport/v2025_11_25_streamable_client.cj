@@ -5,7 +5,7 @@ import stdx.net.http.*
 import std.io.InputStream
 import std.collection.{ArrayList, HashMap}
 import std.sync.{Mutex, Condition}
-import stdx_log.NoopLogger
+import stdx.log.NoopLogger
 
 public class StreamableHttpClient_2025_11_25 <: Transport {
     private let endpointUrl: String
