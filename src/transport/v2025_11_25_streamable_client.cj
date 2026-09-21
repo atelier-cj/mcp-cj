@@ -127,6 +127,19 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
             }
 
             let body = this.readBody(resp.body)
+            if (resp.status < 200 || resp.status >= 300) {
+                if (!looksLikeJsonMessage(body)) {
+                    // HTTP 层的失败原样投递只会变成一句 "Parse error"，把服务端
+                    // 真正说的话（会话失效 / 鉴权失败 / 路径写错）盖掉
+                    throw Exception(httpFailureText(resp.status, this.endpointUrl, body))
+                }
+            } else if (body.size == 0) {
+                // 2xx 却是空体：规范里只该出现在 202（上面已返回）。喂给解析器同样
+                // 只会得到 "Parse error"，原因（对端没按规范回）反而看不见
+                eprintln("[mcp] empty body from ${this.endpointUrl} (status ${resp.status})")
+                return
+            }
+
             let result = Array<Byte>(body.size + 1, repeat: 0)
             for (i in 0..body.size) { result[i] = body[i] }
             result[body.size] = 10
