@@ -13,7 +13,7 @@ package mcp
 // 照旧投递（调用方要拿得到 code/message）。
 
 import jsonvalue.*
-import ystyle::jsonrpc.{Transport, Result}
+import ystyle::jsonrpc.{Transport, Result, NewlineFraming}
 import mcp.transport.*
 import stdx.net.http.*
 import std.collection.{ArrayList, HashMap}
@@ -191,5 +191,57 @@ func statelessTransport_htmlErrorBodyIsSurfaced() {
     }
     if (!message.contains("HTTP 502")) {
         @Fail("message should carry the status code, got: ${message}")
+    }
+}
+
+// ── 换行分帧：响应体自带换行时不能多出空行 ─────────────────────
+
+/** 发一条请求并取回被入队的那条消息（未入队则返回空数组）。 */
+func roundTripFramed(transport: Transport, server: ErrorServer): Array<Byte> {
+    transport.send(NewlineFraming().encode(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}".toArray()))
+    let framed = match (transport.receive()) {
+        case Some(b) => b
+        case None => Array<Byte>()
+    }
+    transport.close()
+    server.close()
+    framed
+}
+
+@Test
+func sessionTransport_bodyWithTrailingNewlineYieldsOneMessage() {
+    // Go 的 mcp-go 会在 JSON 后面自带换行。传输层若再补一个，就多出一个空行——
+    // 换行分帧把空行解成一条空消息，于是每次**成功**的响应都附赠一句
+    // `[jsonrpc] client handleMessage error: Exception: Parse error`，
+    // 而调用本身正常，线索全指向解析器。
+    let server = ErrorServer(UInt16(200), "application/json", { _ =>
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n"
+    })
+    let framed = roundTripFramed(StreamableHttpClient_2025_11_25(server.baseUrl), server)
+
+    @Assert(framed.size > 0)
+    match (NewlineFraming().decode(framed)) {
+        case Some((body, consumed)) =>
+            // 必须正好解出一条非空消息，且不剩任何字节（剩下的就是那个空行）
+            @Expect(consumed, framed.size)
+            @Assert(body.size > 0)
+        case None => @Fail("expected one decodable message")
+    }
+}
+
+@Test
+func statelessTransport_bodyWithTrailingNewlineYieldsOneMessage() {
+    let server = ErrorServer(UInt16(200), "application/json", { _ =>
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n"
+    })
+    let framed = roundTripFramed(StatelessHttpClient_2026_07_28(server.baseUrl), server)
+
+    @Assert(framed.size > 0)
+    match (NewlineFraming().decode(framed)) {
+        case Some((body, consumed)) =>
+            @Expect(consumed, framed.size)
+            @Assert(body.size > 0)
+        case None => @Fail("expected one decodable message")
     }
 }

@@ -75,9 +75,7 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
                             let content = line[6..]
                             if (!content.startsWith("{") && !content.startsWith("[")) { continue }
                             let bytes = content.toArray()
-                            let result = Array<Byte>(bytes.size + 1, repeat: 0)
-                            for (i in 0..bytes.size) { result[i] = bytes[i] }
-                            result[bytes.size] = 10
+                            let result = frameLine(bytes)
                             synchronized(this.lock) {
                                 this.responseQueue.add(result)
                                 this.cond.notifyAll()
@@ -140,9 +138,7 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
                 return
             }
 
-            let result = Array<Byte>(body.size + 1, repeat: 0)
-            for (i in 0..body.size) { result[i] = body[i] }
-            result[body.size] = 10
+            let result = frameLine(body)
             synchronized(this.lock) {
                 this.responseQueue.add(result)
                 this.cond.notifyAll()
@@ -176,9 +172,9 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
                         if (line.startsWith("data: ")) {
                             let content = line[6..]
                             let bytes = content.toArray()
-                            let result = Array<Byte>(bytes.size + 1, repeat: 0)
-                            for (i in 0..bytes.size) { result[i] = bytes[i] }
-                            result[bytes.size] = 10
+                            // 只有 JSON 对象/数组才是协议消息（保活/空 data 行跳过）
+                            if (!looksLikeJsonMessage(bytes)) { continue }
+                            let result = frameLine(bytes)
                             synchronized(this.lock) {
                                 this.responseQueue.add(result)
                                 this.cond.notifyAll()
