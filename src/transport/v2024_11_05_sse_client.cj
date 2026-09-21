@@ -107,10 +107,10 @@ public class HttpSseClient_2024_11_05 <: Transport {
             if (line.startsWith("data: ")) {
                 let content = line[6..]
                 let bytes = content.toArray()
-                let result = Array<Byte>(bytes.size + 1, repeat: 0)
-                for (i in 0..bytes.size) { result[i] = bytes[i] }
-                result[bytes.size] = 10
-                return Some(result)
+                // 只有 JSON 对象/数组才是协议消息：SSE 的保活/注释行不能入队，
+                // 否则只会变成一句 "Parse error"
+                if (!looksLikeJsonMessage(bytes)) { continue }
+                return Some(frameLine(bytes))
             }
         }
         None

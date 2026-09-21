@@ -48,3 +48,17 @@ func httpFailureText_carriesStatusUrlAndBody() {
     @Expect(httpFailureText(UInt16(500), "http://x/mcp", Array<Byte>()),
         "HTTP 500 from http://x/mcp")
 }
+
+// ── 换行分帧：响应体自带换行时不能多出空行 ─────────────────────
+
+@Test
+func frameLine_alwaysEndsWithExactlyOneNewline() {
+    @Expect(frameLine("{}".toArray()).size, 3)
+    // 服务端自带换行（Go 的 mcp-go 就是）：不能再补一个
+    @Expect(frameLine("{}\n".toArray()).size, 3)
+    @Expect(frameLine("{}\r\n".toArray()).size, 3)
+    @Expect(frameLine("{}\n\n".toArray()).size, 3)
+    // 空体也保持「一条空记录」的形态，交由调用方判断要不要入队
+    @Expect(frameLine(Array<Byte>()).size, 1)
+    @Expect(String.fromUtf8(frameLine("{}\n".toArray())), "{}\n")
+}
