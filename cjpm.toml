@@ -13,10 +13,15 @@
   override-compile-option = ""
   src-dir = ""
   target-dir = ""
-  version = "2.3.11"
+  version = "2.3.12"
   license = ["MulanPSL-2.0"]
   authors = ["ystyle"]
   repository = "https://atomgit.com/ystyle/mcp-cj"
+  # 制品清单：消费方 cjpm build 需要什么就带什么。
+  #   ① 只有 exclude 能挡住目录（include 挡不住，实测 include=["src"] 仍会带 examples/）；
+  #   ② cjpm 按**工作树**打包而非 git，故未跟踪的调试产物（log.txt、*.png）也必须显式挡掉。
+  include = ["src", "cjpm.toml", "README.md", "LICENSE"]
+  exclude = ["docs", "target", "cjpm.lock", "log.txt", "*.png", "opencode.json", "schema.json", "schema-latest.json", "schema.ts", "test_e2e.sh", "jsonrpc.md"]
 
 [package.package-configuration."mcp.examples.basic"]
 output-type = "executable"
