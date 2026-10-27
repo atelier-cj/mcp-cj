@@ -132,6 +132,13 @@ public class CallToolResult <: JsonSerializable & JsonDeserializable<CallToolRes
         r.isError = false
         r
     }
+    // 文本 + 结构化数据一并返回：给人看的说明与给程序读的字段一次给全，
+    // 调用方不必再从文本里 parse（分页信息这类"机器要用"的字段尤其如此）。
+    public static func text(text: String, structured: JsonValue): CallToolResult {
+        let r = CallToolResult.text(text)
+        r.structuredContent = Some(structured)
+        r
+    }
 }
 
 public class CallToolRequest <: JsonSerializable & JsonDeserializable<CallToolRequest> {

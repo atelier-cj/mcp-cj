@@ -78,3 +78,21 @@ func callToolResultParsesLegacyWithoutStructuredContent() {
 private func parseCallToolResult(text: String): CallToolResult {
     CallToolResult.fromJson(JsonReader(ByteBuffer(text.toArray())))
 }
+
+@Test
+func callToolResultTextWithStructuredConvenience() {
+    // text(text, structured) 是给"一句话 + 一组字段"这种最常见形态的便捷构造，
+    // 两半都要在，且 isError 保持 false。
+    let obj = HashMap<String, JsonValue>()
+    obj["total"] = JsonValue.Number(0.0)
+    let r = CallToolResult.text("（无匹配条目）", JsonValue.Map(obj))
+    @Expect(r.isError, false)
+    @Expect(r.content.size, Int64(1))
+    match (r.structuredContent) {
+        case Some(_) => @Expect(true, true)
+        case None => @Fail("structuredContent 未设置")
+    }
+    let text = jsonOf(r)
+    @Expect(text.contains("structuredContent"), true)
+    @Expect(text.contains("无匹配条目"), true)
+}
