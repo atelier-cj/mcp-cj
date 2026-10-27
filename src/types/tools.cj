@@ -102,18 +102,27 @@ public class ToolInputSchema <: JsonSerializable & JsonDeserializable<ToolInputS
 public class CallToolResult <: JsonSerializable & JsonDeserializable<CallToolResult> {
     public var content = ArrayList<ContentBlock>()
     public var isError: Bool = false
+    // 机器可读的结构化结果（MCP 2025-06-18 的 structuredContent）。
+    // 与 content 并列：content 给人读，这里给程序读。None = 不输出该字段——
+    // 老服务端/不关心结构的工具保持原有响应形状，严格校验方也不会收到空对象。
+    public var structuredContent: Option<JsonValue> = None
     public init() {}
     public func toJson(w: JsonWriter): Unit {
         w.startObject()
         w.writeName("content").writeValue(this.content)
         w.writeName("isError").writeValue(this.isError)
+        match (this.structuredContent) {
+            case Some(v) => w.writeName("structuredContent").writeValue(v)
+            case None => ()
+        }
         w.endObject()
     }
     public static func fromJson(r: JsonReader): CallToolResult {
         let res = CallToolResult()
         fromJsonObject(r,
             ("content", {=> res.content = r.readValue<ArrayList<ContentBlock>>()}),
-            ("isError", {=> res.isError = r.readValue<Bool>()})
+            ("isError", {=> res.isError = r.readValue<Bool>()}),
+            ("structuredContent", {=> res.structuredContent = Some(r.readValue<JsonValue>())})
         )
         res
     }
@@ -121,6 +130,13 @@ public class CallToolResult <: JsonSerializable & JsonDeserializable<CallToolRes
         let r = CallToolResult()
         r.content = ArrayList<ContentBlock>([ContentBlock.Text(TextContent(text))])
         r.isError = false
+        r
+    }
+    // 文本 + 结构化数据一并返回：给人看的说明与给程序读的字段一次给全，
+    // 调用方不必再从文本里 parse（分页信息这类"机器要用"的字段尤其如此）。
+    public static func text(text: String, structured: JsonValue): CallToolResult {
+        let r = CallToolResult.text(text)
+        r.structuredContent = Some(structured)
         r
     }
 }
