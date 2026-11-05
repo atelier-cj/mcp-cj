@@ -86,6 +86,17 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
             case None => ()
         }
 
+        // SSE 只能长连接：**必须把读超时设成不限**。
+        //
+        // `ClientBuilder` 默认 readTimeout = 15s，而 SSE 是长连接——订阅之后
+        // 服务端可能十几分钟才推一次（群里没人说话就一直没有）。套用 15 秒
+        // 默认值的结果是**流被悄悄切断**：服务端还在推，客户端已经收不到了，
+        // 而且没有任何报错（表现为"订阅建立后过一会儿就收不到通知"）。
+        //
+        // 判据：这个 transport 的客户端声明了 `accept: ... text/event-stream`，
+        // 响应可能是流。响应可能长，所以读不设限；写超时仍用默认
+        // （请求体很小，卡住就是真有问题）。
+        builder.readTimeout(Duration.Max)
         let req = builder.body(json).post().build()
         try {
             let resp = this.client.send(req)

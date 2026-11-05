@@ -37,6 +37,10 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
             let builder = HttpRequestBuilder()
                 .url(this.endpointUrl)
                 .header("Accept", "text/event-stream")
+            // 通知流是 SSE 长连接：读超时必须不限。
+            // 默认 15s 会让流在静默期被悄悄切断（服务端还在推、客户端收不到，
+            // 且没有报错）。详见 stateless client 同名位置的注释。
+            builder.readTimeout(Duration.Max)
             for ((k, v) in this.customHeaders) { builder.header(k, v) }
             let req = builder.get().build()
             let resp = this.client.send(req)
