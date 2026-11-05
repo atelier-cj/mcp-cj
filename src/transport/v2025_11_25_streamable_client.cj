@@ -205,15 +205,21 @@ public class StreamableHttpClient_2025_11_25 <: Transport {
         total.toArray()
     }
 
+    // **返回值只有两种含义**：Some(数据) / None(真的关闭了)。超时不返回 None。
+    //
+    // 为什么必须严格：json-rpc 的接收循环把 None 当作对端关闭并 `shutdown()`，
+    // 让接收线程永久退出。此前这里空等 30 秒后返回 None，于是**只要 30 秒
+    // 没有消息就判定连接断掉**——普通请求踩不到（往返很快），但订阅场景
+    // 天然有长时间静默，一建立就假死。详细分析见 stateless client 的同名方法。
     public func receive(): ?Array<Byte> {
         synchronized(this.lock) {
             while (this.responseQueue.size == 0 && !this.closed) {
-                this.cond.wait(timeout: 30 * Duration.second)
+                this.cond.wait()
             }
             if (this.responseQueue.size > 0) {
-                Some(this.responseQueue.remove(at: 0))
+                Option<Array<Byte>>.Some(this.responseQueue.remove(at: 0))
             } else {
-                None
+                Option<Array<Byte>>.None
             }
         }
     }
