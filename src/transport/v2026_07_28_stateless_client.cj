@@ -220,15 +220,29 @@ public class StatelessHttpClient_2026_07_28 <: Transport {
         total.toArray()
     }
 
+    // 取一条服务端消息。
+    //
+    // **返回值只有两种含义**：Some(数据) / None(真的关闭了)。
+    // 这里不做超时返回——超时是"暂时还没有"，不是"连接断了"。
+    //
+    // 为什么这条契约必须严格：json-rpc 的接收循环把 None 当作对端关闭，
+    // 会 `shutdown()` 让接收线程永久退出。此前的实现对队列空等 30 秒后
+    // 返回 None，于是**只要 30 秒没有消息，连接就被判定为断掉**。
+    //
+    // 普通请求是"发了就有回"，往返远小于 30 秒，踩不到；而订阅（服务端主动推）
+    // 天然有长时间静默——群里没人说话就 30 秒、几分钟都没消息。
+    // 于是订阅一建立，过 30 秒就假死（实测现象：`client transport closed by peer`）。
+    //
+    // 无超时等待是安全的：`close()` 会置位并 `notifyAll()`，此时立刻返回 None。
     public func receive(): ?Array<Byte> {
         synchronized(this.lock) {
             while (this.responseQueue.size == 0 && !this.closed) {
-                this.cond.wait(timeout: 30 * Duration.second)
+                this.cond.wait()
             }
             if (this.responseQueue.size > 0) {
-                Some(this.responseQueue.remove(at: 0))
+                Option<Array<Byte>>.Some(this.responseQueue.remove(at: 0))
             } else {
-                None
+                Option<Array<Byte>>.None
             }
         }
     }
